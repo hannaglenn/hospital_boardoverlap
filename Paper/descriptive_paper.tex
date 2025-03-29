@@ -101,12 +101,12 @@ sorting=ynt,citestyle=authoryear]{biblatex}
 
     The presence of overlapping board members across firms, also referred to as board interlock, has been heavily studied in corporate finance, particularly for large publicly traded firms. By the Clayton Act of 1914, board overlap among sufficiently large competing firms is illegal. Yet, it is known to exist even among the largest publicly traded firms. Researchers have found that board overlap is correlated with governance practices, performance, investment in research and development, and product differentiation (\cite{cai2014board}; \cite{lamb2016ties}; \cite{geng2021does}). While the Department of Justice has increased scrutiny of board overlap, their focus has remained on tech and private firms (\cite{Morse2023}). Board overlap does occur in health care with instances of organizations denied merger permission due to boards not acting independently (\cite{huberfeld2006tackling}), of hospitals declaring informal affiliations through leadership (\cite{barnett_babcock_2012}), and of life sciences companies with substantial documented overlap (\cite{manjunath2024illegal}). However, little is known about how prevalent board overlap is in the hospital industry, and whether it is correlated with other hospital characteristics. 
 
-    In this paper, I form networks of hospital board of director members using Tax Form 990s, which requires nonprofits in the US to declare the identities and compensation information of their board. Extracting these identities and matching to other sources of hospital information, I show that approximately 7\% of the nonprofit hospitals in the sample are affiliated with another hospital in the same market through shared board members, even excluding system or network affiliations. [Add more results]
+    In this paper, I form networks of hospital board of director members using Tax Form 990s, which requires nonprofits in the US to declare the identities and compensation information of their board. Extracting these identities and matching to other sources of hospital information, I show that approximately 8\% of the nonprofit hospitals in the sample are affiliated with another hospital in the same market through shared board members, even excluding system or network affiliations. Among hospitals that share board members, two thirds of the hospital pairs are between two general adult hospitals. That is, a majority of the shared board members serve on directly competing hospitals in the same geographic market. 
 
     Establishing descriptive evidence of board overlap in hospitals, this paper encourages future research to take seriously this behavior as potentially having downstream effects for patients. While formal integration in health care should not be overlooked, there is a call for future research to scrutinize other forms of firm allegiance in policy and regulation. 
 
 
-    \section{Related Literature}
+    \section{Related Literature}\label{sec:relatedlit}
 
 
     \subsection{Overlapping Board Members}\label{sec:boardoverlaplit}
@@ -154,11 +154,24 @@ sorting=ynt,citestyle=authoryear]{biblatex}
 
     
 
-    
+    \subsection{Informing Hospital Behaviors}\label{sec:hospbehaviors}
+
+    The main purpose of this paper is to document the prevalence of board overlap in US hospitals in Section \ref{sec:document}. While I do not establish any causal relationship between board overlap and hospital behaviors, I consider the literature on board overlap, common ownership, and hospital consolidation discussed in Section \ref{sec:relatedlit} to inform a set of hospital behaviors that may be relevant for future research. I divide these behaviors into three categories: price/quality, investment decisions, and differentiation. 
+
+    The hospital consolidation literature highlights price and quality of care as key factors in the industry. Mergers often grant hospitals greater market power, enabling them to negotiate higher prices with insurance companies. It is unclear whether shared board members would lead to similar price increases. If board overlap facilitates information sharing about negotiations, it could indirectly influence pricing. However, direct board involvement in pricing decisions seems less likely. Nevertheless, with access to data on actual prices charged by hospitals, this remains an interesting outcome for future research to explore.
+
+    It seems more likely that quality of care could be impacted by overlapping board members among hospitals. There are direct actions that could lead to changes in quality such as convergence in treatment styles or investment in technology, which I will discuss in detail in the following sections. There is also an indirect path through which overlapping board members might impact quality, which is that hospitals might compete for the same pool of experienced board members. If the board members with the most expertise are in high demand, sharing that expertise among multiple hospitals could facilitate greater improvements. The most commonly used measurements of quality of care in hospitals are mortality and readmission rates. 
+
+    In both board overlap and common ownership, several investment decisions are shown to be associated with established firm affiliation. First, hospitals with board affiliations might be more likely to merge in the future. Second, sharing board members could facilitate engaging in the same types of technology or capital. Therefore, an area of future research is to look at outcomes such as health information technology investments, specific medical technology advancements in the hospital, and capital investments. 
+
+    Finally, previous research has shown that product differentiation is associated with board overlap in other industries. That is, sharing information among competing hospitals leads to more specialization. In hospitals, there are two distinct types of differentiation: either through services offered, or the types of patients admitted. Both of these are also key findings in the hospital merger literature, indicating that affiliations through board members could also facilitate changes in these areas. 
 
     
 
-    \section{Documenting Overlapping Board Members in US Hospitals}\label{sec:data}
+
+    
+
+    \section{Documenting Overlapping Board Members in US Hospitals}\label{sec:document}
 
     \subsection{Data Construction}
 
@@ -176,9 +189,11 @@ sorting=ynt,citestyle=authoryear]{biblatex}
 
     \subsection{Summary Statistics}
 
-    First, I present a summary statistics table showing characteristics of all hospitals in the final sample. These hospitals are all nonprofit due to the restriction of only nonprofits filing Tax Form 990s. 
+    First, I present a summary statistics table showing characteristics of all hospitals in the final sample, which consists of 1,466 nonprofit hospitals, almost all of which are adult general hospitals. They have, on average, 178 beds and 14 board members. Almost 40\% of the hospitals in the sample are academic medical centers, almost 70\% of the sample are located in metropolitan areas, and 56\% belong to a system. 
 
-    Of the approximately 1400 hospitals in the final sample, 7\% are affiliated with another hospital through a shared board member. In Figure \ref{fig:connected_percent}, I show that this percentage remains relatively constant over time, with a slight decrease from 132 affiliated hospitals in 2017 to 117 affiliated hospitals in 2021. As mentioned previously, common board members should be more likely to affect behavior within a hospital market, where hospitals compete for the same patient population. Therefore, in Figure \ref{fig:connected_HRR_percent}, I show the prevalence of having shared board members within a hospital market. Of the 306 HRRs in the US, approximately 17\% have at least one pair of board affiliated hospitals within the market. This proportion decreases slightly over time, with 15\% of HRRs having connected hospitals in 2021, a nominal decrease of 8 markets losing hospitals with affiliation. 
+    \import{Objects}{all_summarystats.tex}
+
+    Eight percent of hospitals in the sample have overlapping board members with an otherwise unaffiliated hospital. In Figure \ref{fig:connected_percent}, I show that this percentage remains relatively constant over time, with a slight decrease from 129 affiliated hospitals in 2017 to 114 affiliated hospitals in 2021. I include 2022 values, but there are less total firms in the sample due to lag in tax forms being made available publicly. As mentioned previously, common board members should be more likely to affect behavior within a hospital market, where hospitals compete for the same patient population. Therefore, in Figure \ref{fig:connected_HRR_percent}, I show the prevalence of having shared board members within a hospital market. Of the 306 HRRs in the US, approximately 17\% have at least one pair of board affiliated hospitals within the market. This proportion decreases slightly over time, with 15\% of HRRs having connected hospitals in 2021, a nominal decrease of 8 markets losing hospitals with affiliation. This is likely due to increased system affiliations, which mechanically decreases board overlap according to the definition I use here. 
 
 
     \begin{figure}[ht!]
@@ -197,7 +212,7 @@ sorting=ynt,citestyle=authoryear]{biblatex}
         \label{fig:connected_HRR_percent}
     \end{figure}
 
-    Next, I present he geographic distribution of these pairs in Figure \ref{fig:connected_maps}. The blue dots represent hospitals that share a common board member, and the red dots are all other hospitals. Connected hospitals are distributed fairly evenly across the US, apart from relatively few connections on the west coast relative to the population. Over time, the connections remain fairly consistent geographically.
+    Next, I present geographic distribution of these pairs in Figure \ref{fig:connected_maps}. The blue lines represent hospitals that share a common board member, and the red dots are all other hospitals. Connected hospitals are distributed fairly evenly across the US, apart from relatively few connections on the west coast relative to the population. Over time, the connections remain fairly consistent geographically. Taken together, these show that board overlap is a prevalent occurrence among nonprofit hospitals in the US from 2017 onward. 
 
     \begin{figure}[ht!]
         \centering
@@ -208,9 +223,14 @@ sorting=ynt,citestyle=authoryear]{biblatex}
 
 
 
-    I present the proportion of the type of hospital affiliations in Table \ref{tab:hospital_pair_types}. Each hospital is general or specialty (I only consider adult hospitals for these categories), children or adult, and independent or system, all characteristics found in the AHA data. Two-thirds of board affiliated pairs are between two adult general hospitals, and 10\% of pairs are between a specialty and a general hospital. In the main analysis, I focus only on the affiliations between adult general hospitals, as this is the most prominent pair type and the most direct competition. There is also significant variation in the ownership type of pairs. Forty-five percent of pairs are between two non-system affiliated hospitals, and 36\% of pairs are between an independent hospital affiliated with a hospital belonging to a system. In total, there are 217 hospitals that are affiliated with at least one other hospital through shared board members at some point in the sample. 
+    I now shift to examining characteristics of hospitals with board overlap. I present the proportion of the type of hospital pairs in Table \ref{tab:hospital_pair_types}. Each hospital is general or specialty (I only consider adult hospitals for these categories), children or adult, and independent or belonging to a system, all characteristics in the AHA data. Two-thirds of board affiliated pairs are between two adult general hospitals, and 10\% of pairs are between a specialty and a general hospital. Thus, for the majority of hospitals that have board interlock, the hospital they share a board member with is a direct competitor. 
 
     \import{Objects}{hospital_pair_types.tex}
+    
+    There is also significant variation in the ownership type of hospitals within affiliated pairs. Forty-five percent of pairs are between two non-system affiliated hospitals, and 36\% of pairs are between an independent hospital affiliated with a hospital belonging to a system. The lowest proportion of shared board member pairs is made up of two hospitals belonging to different systems. In total, there are 217 hospitals that share a board member with at least one other hospital at some point in the sample. 
+
+    In Table 
+
 
     I now shift towards examining summary statistics of hospitals with different types of affiliation relationships. First, in Table \ref{tab:hospital_general_summarystats}, I focus on general hospitals in four categories: board affiliated with another general hospital, board affiliated with a specialty hospital, unaffiliated through board members but belonging to a system, and completely unaffiliated. I present means of hospitals in each of these categories for the number of beds, the number of patients seen, whether it is an academic medical center, whether the hospital is located in a metropolitan area, and whether the hospital belongs to a system. On these dimensions, hospitals affiliated with other general hospitals (column 1) are relatively similar to unaffiliated hospitals that are part of a system (column 3). Unaffiliated hospitals that are not part of a system are slightly smaller in terms of bed size and number of patients seen, and less likely to be in a metropolitan area. The hospitals in column (2) are outliers, with a large number of beds and patients seen, and mainly in metropolitan areas. There are only 12 hospitals in this sample that are likely very different from the average general hospital. 
 
@@ -223,42 +243,6 @@ sorting=ynt,citestyle=authoryear]{biblatex}
     \import{Objects}{hospital_specialty_summarystats.tex}
     
     
-
-    \section{Hospital Behaviors}\label{sec:hospbehaviors}
-
-    I consider the literature on overlapping boards, common ownership, and hospital consolidation discussed in Section to theoretically found the firm behaviors that may be associated with overlapping boards in this particular industry. 
-
-    \subsection{Variable Definitions}
-
-    First, I define an indicator variable for whether a hospital has a shared board member with another hospital within the same market, which I refer to as being board affiliated. Specifically, a hospital is board affiliated if the same individual is a board member of two otherwise unaffiliated hospitals. That is, two hospitals that do not belong to the same system or network can be affiliated through board members, but same-system or same-network hospitals can not. I make this distinction to separate the variation in affiliation by board member alone versus simply having shared board members due to being in the same system, which is likely already correlated with service offerings. I also focus on board affiliations within the same hospital market, as the outcomes of interest focus on competing for patients in a specific geographic region. I measure hospital markets using Hospital Referral Regions (HRRs) as defined by Dartmouth Atlas of Healthcare.
-
-    I will now define the five outcomes that I analyze in Section \ref{sec:boardanalysis}. I construct two measures of specialization based on modified Herfindahl-Hirschman Index (HHI) calculations. The first uses the number of beds allocated to specific services, variables found in the AHA data. For services $j$ in the list of all possible services\footnote{General medical and surgical (adult), General medical and surgical (pediatric), Obstetric care, Medical/surgical intensive care, Cardiac intensive care, Neonatal intensive care, Neonatal intermediate care, Pediatric intensive care beds, Burn care, Other Special Care, Other intensive care, Physical Rehabilitation care, Alcohol/drug abuse or dependency inpatient care, Psychiatric care, Skilled nursing care, Intermediate nursing care, Acute long term care, Other long-term care, Other care}, the concentration of bed allocation is defined as 
-
-    $$HHI_{bed} = \sum_{j}\left(\frac{beds_j}{total beds}\right)^2.$$
-
-    The second concentration measure focuses on patients seen for certain conditions in each hospital. The CMS Provider Utilization files contain measures of the percent of patients seen for different conditions. Therefore, for services $k$ in the list of conditions in the CMS data\footnote{Percent Of Beneficiaries Identified With Combined Cancer Flag For 6 Cancer Indicators, Percent Of Beneficiaries Identified With Chronic Obstructive Pulmonary Disease, Percent Of Beneficiaries Identified With Chronic Kidney Disease, Percent Of Beneficiaries Identified With Heart Failure And Non-Ischemic Heart Disease}, I define the concentration of patient conditions in each hospital as 
-
-    $$HHI_{patient} = \sum_{k}\left(\frac{patients_k}{total patients}\right)^2.$$
-
-    The other outcomes I consider are the total number of Medicare beneficiaries seen, from the CMS data, the total number of Medicaid discharges, from the AHA data, and the average risk score of Medicare beneficiaries, from the CMS data. I present a table of summary statistics for these outcomes, as well as demographics, of the hospitals in the sample, in Table \ref{all_sumstats}. 
-
-    \import{Objects}{all_summarystats.tex}
-    
-
-
-    \section{Documenting Board of Director Affiliation}
-
-
-
-
-    In Figure \ref{fig:concentration_services_time}, I show the AHA measure of service concentration based on the number of beds over time for general hospitals with different levels of affiliation. General hospitals that are unaffiliated through board members, whether they are affiliated with a system or not, remain relatively constant in their service offerings over time. However, general hospitals that are affiliated with another general hospital through a shared board member display increasing service concentration over time, providing descriptive evidence that there may be some correlation between board affiliations and the services offered in hospitals.  
-
-    \begin{figure}[ht!]
-        \centering
-        \caption{Concentration of services offered over time}
-        \includegraphics[width=0.8\textwidth]{Objects/concentration_services_time.pdf}
-        \label{fig:concentration_services_time}
-    \end{figure}
 
 
   
