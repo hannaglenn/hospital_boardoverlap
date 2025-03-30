@@ -249,11 +249,12 @@ filer_data <- hospital_connections %>%
   mutate(connected = ifelse(other_ein!="" & !is.na(other_ein), 1, NA)) %>%
   group_by(TaxYr, filer_id) %>%
   fill(connected, .direction = "downup") %>%
+  mutate(num_connections = sum(connected, na.rm = TRUE)) %>%
   ungroup() %>%
   mutate(connected = ifelse(is.na(connected), 0, connected)) %>%
   distinct(TaxYr, filer_id, connected, .keep_all = TRUE) 
 
-# join number of people people
+# join number of people
 filer_data <- filer_data %>%
   mutate(TaxYr = as.character(TaxYr)) %>%
   left_join(number_board_people, by = c("TaxYr"="TaxYr", "Filer.EIN"="Filer.EIN"))
@@ -303,7 +304,8 @@ tab1_data <- filer_data %>%
                  "Academic" = "academic",
                  "In Metrop. Area"="metro",
                  "Number of Board Members" = "num_board",
-                 "Overlapping Board"="connected"), 
+                 "Overlapping Board"="connected",
+                 "Number of Connections" = "num_connections"), 
                list(m=mean,min=min,max=max,sd=sd), na.rm=T) %>%
   mutate_if(is.numeric, ~ifelse(abs(.)==Inf,NA,.))  %>%
   gather(key=var,value=value) %>%
@@ -316,7 +318,7 @@ tab1_data <- filer_data %>%
          max = ifelse(max>9, round(max,0), round(max,2)),
          sd = ifelse(sd>9, round(sd,0), round(sd,2))) 
 
-knitr::kable(tab1_data[c(7,4,10,2,3,1,5,6,8,9,11),],
+knitr::kable(tab1_data[c(7,4,11,2,3,1,5,6,8,10,9,12),],
                format = "latex",
                col.names = c("Variable", "Mean", "Min", "Max", "SD"),
                caption = "Full Sample Summary Statistics\\label{all_sumstats}",
@@ -450,20 +452,26 @@ ggsave("Objects//connected_maps.pdf", width = 6, height = 6.5, units = "in")
 
 
 # Summarise hospital pairs
-hospital_connected_pairs <- hospital_pairs %>%
+hospital_connected_pairs <- hospital_connections %>%
   select(TaxYr, filer_id, other_id) %>%
   filter(!is.na(filer_id) & !is.na(other_id))
 
+# create variable for number of connections
+hospital_connected_pairs <- hospital_connected_pairs %>%
+  group_by(TaxYr, filer_id) %>%
+  mutate(n_connections = n_distinct(other_id)) %>%
+  ungroup()
+
 AHA_pair <- AHA %>%
-  select(YEAR, ID, SERV, BDTOT, MNAME, SYSID) %>%
+  select(YEAR, ID, SERV, BDTOT, MNAME, SYSID, LAT, LONG) %>%
   filter(YEAR>=2016 & YEAR<=2022)
 
 # join by filer_id
 hospital_connected_pairs <- hospital_connected_pairs %>%
   left_join(AHA_pair, by=c("filer_id"="ID", "TaxYr"="YEAR")) %>%
-  rename(filer_SERV = SERV, filer_BDTOT = BDTOT, filer_name = MNAME, filer_sysid = SYSID) %>%
+  rename(filer_SERV = SERV, filer_BDTOT = BDTOT, filer_name = MNAME, filer_sysid = SYSID, filer_lat=LAT, filer_long=LONG) %>%
   left_join(AHA_pair, by=c("other_id"="ID", "TaxYr"="YEAR")) %>%
-  rename(other_SERV = SERV, other_BDTOT = BDTOT, other_name = MNAME, other_sysid = SYSID)
+  rename(other_SERV = SERV, other_BDTOT = BDTOT, other_name = MNAME, other_sysid = SYSID, other_lat=LAT, other_long=LONG)
 
 # create variables capturing type of relationship (general - general/ general - specialty/specialty - specialty)
 hospital_connected_pairs <- hospital_connected_pairs %>%
@@ -480,6 +488,26 @@ hospital_connected_pairs <- hospital_connected_pairs %>%
          sys_sys = ifelse(!is.na(filer_sysid) & !is.na(other_sysid), 1, 0),
          ind_sys = ifelse((is.na(filer_sysid) & !is.na(other_sysid)) | (!is.na(filer_sysid) & is.na(other_sysid)), 1, 0))
 
+# create variables for small vs. large hospitals
+# median bed size of all hospitals
+median_bed_size <- median(filer_data$HOSPBD, na.rm = TRUE)
+
+hospital_connected_pairs <- hospital_connected_pairs %>%
+  mutate(small_small = ifelse(filer_BDTOT < median_bed_size & other_BDTOT < median_bed_size, 1, 0),
+         small_large = ifelse((filer_BDTOT < median_bed_size & other_BDTOT >= median_bed_size) | (filer_BDTOT >= median_bed_size & other_BDTOT < median_bed_size), 1, 0),
+         large_large = ifelse(filer_BDTOT >= median_bed_size & other_BDTOT >= median_bed_size, 1, 0))
+
+# calculate the geographic distance between hospitals in the pair
+hospital_connected_pairs <- hospital_connected_pairs %>%
+  mutate(distance = ifelse(!is.na(filer_lat) & !is.na(other_lat) & !is.na(filer_long) & !is.na(other_long),
+                          geosphere::distHaversine(cbind(filer_long, filer_lat), cbind(other_long, other_lat)), NA)) %>%
+  mutate(distance = ifelse(distance > 0, distance / 1000, NA)) %>% # convert to kilometers
+  mutate(distance_miles = ifelse(!is.na(distance), distance * 0.621371, NA)) # convert to miles
+
+# create variable for difference in number of beds
+hospital_connected_pairs <- hospital_connected_pairs %>%
+  mutate(bed_diff = abs(filer_BDTOT - other_BDTOT))
+
 
 # put these values in a table 
 pair_table <- hospital_connected_pairs %>%
@@ -492,19 +520,30 @@ pair_table <- hospital_connected_pairs %>%
             "Childrens - Childrens" = mean(child_child),
             "Ind. - Ind." = mean(ind_ind),
             "Sys. - Sys." = mean(sys_sys),
-            "Ind. - Sys." = mean(ind_sys))
+            "Ind. - Sys." = mean(ind_sys),
+            "Small - Small" = mean(small_small),
+            "Small - Large" = mean(small_large),
+            "Large - Large" = mean(large_large),
+            "Bed Difference" = mean(bed_diff, na.rm=T),
+            "Distance (km)" = mean(distance, na.rm=T),
+            "Distance (miles)" = mean(distance_miles, na.rm=T),
+            "Number of Connections" = mean(n_connections))
 
 # pivot longer
 pair_table <- pair_table %>%
-  pivot_longer(cols = `General - General`:`Ind. - Sys.`, names_to = "variable", values_to = "value")
+  pivot_longer(cols = `General - General`:`Number of Connections`, names_to = "variable", values_to = "value")
 
 # add row for total number of connected hospitals
 pair_table <- pair_table %>%
   add_row(variable = "Total Connected Hospitals", value = nrow(distinct(hospital_connected_pairs, filer_id)))
 
+pair_table <- pair_table %>%
+  mutate(value = ifelse(value>9, round(value,0), round(value, 2))) %>%
+  mutate(value = as.character(value))
+
 knitr::kable(pair_table, format = "latex",
-             col.names = c("Type of Connected Pair", "Percent"),
-             caption = "Types of Hospital Connections",
+             col.names = c("Type of Connected Pair", "Average"),
+             caption = "Types of Hospital Connections\\label{hospital_pair_types}",
              row.names = FALSE,
              table.envir="table",
              digits=2,
@@ -513,7 +552,333 @@ knitr::kable(pair_table, format = "latex",
              align=c("l","c"),
              position="ht!") %>%
   kable_styling(full_width=F) %>%
+  group_rows("", 1, 3, indent = FALSE) %>%
+  group_rows("", 4, 6, indent = FALSE) %>%
+  group_rows("", 7, 9, indent = FALSE) %>%
+  group_rows("", 10, 13, indent = FALSE) %>%
+  group_rows("", 14, 15, indent = FALSE) %>%
+  group_rows("", 16, 16, indent = FALSE) %>%
+  group_rows("", 17,17, indent=FALSE) %>%
   write("Objects//hospital_pair_types.tex")
+
+
+
+
+# Create table of hospital behaviors for general hospitals that. are either connected or not
+small_connected <- hospital_connected_pairs %>%
+  filter(gen_gen==1) %>%
+  filter(filer_BDTOT <= median_bed_size) %>%
+  distinct(TaxYr, filer_id) %>%
+  mutate(group = "Small Connected") %>%
+  select(TaxYr, filer_id, group)
+n_small_connected <- nrow(distinct(small_connected, filer_id))
+
+large_connected <- hospital_connected_pairs %>%
+  filter(gen_gen==1) %>%
+  filter(filer_BDTOT > median_bed_size) %>%
+  distinct(TaxYr, filer_id) %>%
+  mutate(group = "Large Connected") %>%
+  select(TaxYr, filer_id, group)
+n_large_connected <- nrow(distinct(large_connected, filer_id))
+
+small_unconnected <- filer_data %>%
+  filter(connected==0) %>%
+  filter(HOSPBD <= median_bed_size) %>%
+  mutate(group = "Small Unconnected") %>%
+  distinct(TaxYr, filer_id, group)
+n_small_unconnected <- nrow(distinct(small_unconnected, filer_id))
+
+large_unconnected <- filer_data %>%
+  filter(connected==0) %>%
+  filter(HOSPBD > median_bed_size) %>%
+  mutate(group = "Large Unconnected") %>%
+  distinct(TaxYr, filer_id, group)
+n_large_unconnected <- nrow(distinct(large_unconnected, filer_id))
+
+size_data <- rbind(small_connected, large_connected, small_unconnected, large_unconnected)
+
+AHA_variables <- AHA %>%
+  select(YEAR, ID, GENBD, PEDBD, OBBD, MSICBD, CICBD, NICBD, NINTBD, PEDICBD,
+         BRNBD, SPCICBD, REHABBD, OTHICBD, ACULTBD, ALCHBD, PSYBD, SNBD88, ICFBD88,
+         OTHLBD94, OTHBD94, HOSPBD,
+         FTMT, FTRNTF,
+         ICLABHOS, ACLABHOS, EHLTH,
+         MCDDCH, MCRDCH, MCRNUM)
+
+# join to the size_data
+size_data <- size_data %>%
+  mutate(TaxYr = as.numeric(TaxYr)) %>%
+  left_join(AHA_variables, by = c("TaxYr"="YEAR", "filer_id"="ID"))
+
+# join to cms data
+size_data <- size_data %>%
+  left_join(mcare, by = c("MCRNUM"="Rndrng_Prvdr_CCN", "TaxYr"="year"))
+
+# read in HCRIS data
+hcris <- read_csv("RawData/final_hcris_data.csv") 
+
+hcris <- hcris %>%
+  select(provider_number, year, tot_discharges, mcare_discharges, mcaid_discharges, build_purch, fixedequipment_purch,
+         movableequipment_purch, medrecords_expenses, HIT_purch)
+
+# join to size_data
+size_data <- size_data %>%
+  left_join(hcris, by = c("MCRNUM"="provider_number", "TaxYr"="year"))
+
+# Read in general hospital data set from hospital compare
+for (t in 2017:2022) {
+  assign(paste0("hosp_compare", t), read_csv(paste0("RawData/Hospital Compare General Information/hospital_general_information", t, ".csv")))
+}
+
+hosp_compare2017 <- hosp_compare2017 %>%
+  select(provider_id, hospital_overall_rating) %>%
+  mutate(year=2017)
+hosp_compare2018 <- hosp_compare2018 %>%
+  select(provider_id, hospital_overall_rating) %>%
+  mutate(year=2018)
+hosp_compare2019 <- hosp_compare2019 %>%
+  select(facility_id, hospital_overall_rating) %>%
+  mutate(year=2019) %>%
+  rename(provider_id = facility_id)
+hosp_compare2020 <- hosp_compare2020 %>%
+  select(facility_id, hospital_overall_rating) %>%
+  mutate(year=2020) %>%
+  rename(provider_id = facility_id)
+hosp_compare2021 <- hosp_compare2021 %>%
+  select(facility_id, hospital_overall_rating) %>%
+  mutate(year=2021) %>%
+  rename(provider_id = facility_id)
+hosp_compare2022 <- hosp_compare2022 %>%
+  select(facility_id, hospitaloverallrating) %>%
+  mutate(year=2022) %>%
+  rename(provider_id = facility_id, hospital_overall_rating=hospitaloverallrating)
+
+hosp_compare <- rbind(hosp_compare2017, hosp_compare2018, hosp_compare2019, hosp_compare2020, hosp_compare2021, hosp_compare2022) 
+
+# join to size_data 
+size_data <- size_data %>%
+  left_join(hosp_compare, by = c("MCRNUM"="provider_id", "TaxYr"="year"))
+
+# Create bed concentration measure
+size_data <- size_data %>%
+  mutate(bed_conc = (GENBD/HOSPBD)^2 + (PEDBD/HOSPBD)^2 + (OBBD/HOSPBD)^2 + (MSICBD/HOSPBD)^2 + (CICBD/HOSPBD)^2 + (NICBD/HOSPBD)^2 + (NINTBD/HOSPBD)^2 + 
+           (PEDICBD/HOSPBD)^2 + (BRNBD/HOSPBD)^2 + (SPCICBD/HOSPBD)^2 + (OTHICBD/HOSPBD)^2 + (REHABBD/HOSPBD)^2 + (ALCHBD/HOSPBD)^2 + 
+           (PSYBD/HOSPBD)^2 + (SNBD88/HOSPBD)^2 + (ICFBD88/HOSPBD)^2 + (ACULTBD/HOSPBD)^2 + (OTHLBD94/HOSPBD)^2 + (OTHBD94/HOSPBD)^2)
+
+# Create patient services concentration
+size_data <- size_data %>%
+  mutate(cancer = Bene_CC_PH_Cancer6_V2_Pct,
+         kidney = Bene_CC_PH_CKD_V2_Pct,
+         copd = Bene_CC_PH_COPD_V2_Pct,
+         heart = Bene_CC_PH_IschemicHeart_V2_Pct) %>%
+  mutate(pat_conc = (cancer)^2 + (kidney)^2 + (copd)^2 + (heart)^2)
+
+# Create variables for percent of discharges medicare and medicare from HCRIS
+size_data <- size_data %>%
+  mutate(perc_mcare = ifelse(!is.na(tot_discharges) & tot_discharges > 0, mcare_discharges / tot_discharges, NA),
+         perc_mcaid = ifelse(!is.na(tot_discharges) & tot_discharges > 0, mcaid_discharges / tot_discharges, NA)) 
+
+# indicators for NICU
+size_data <- size_data %>%
+  mutate(NICBD = ifelse(!is.na(NICBD) & NICBD > 0, 1, 0))
+
+
+# Create table summarising variables
+size_data <- size_data %>%
+  group_by(group) %>%
+  summarise_at(c("Overall Hospital Rating"="hospital_overall_rating",
+                 "Health IT Purchases" = "HIT_purch",
+                 "Fixed Equipment Purchases" = "fixedequipment_purch",
+                 "Moveable Equipment Purchases" = "movableequipment_purch",
+                 "Concentration of Services (Beds)" = "bed_conc",
+                 "Concentration of Services (Conditions)" = "pat_conc",
+                 "Percent of Discharges Medicare" = "perc_mcare",
+                 "Percent of Discharges Medicaid" = "perc_mcaid",
+                 "Patient Risk Score" = "Bene_Avg_Risk_Scre",
+                 "Has a NICU" = "NICBD",
+                 "Has a Cath Lab" = "ACLABHOS"), list(mean), na.rm=T) %>%
+  t() %>%
+  as.data.frame() %>%
+  # make row names into its own column
+  tibble::rownames_to_column("Variable") 
+colnames(size_data) <- size_data[1,]
+size_data <- size_data %>%
+  filter(group!="group") %>%
+  mutate_at(vars(-group), as.numeric) %>%
+  add_row(group = "Num. Hospitals", 
+          `Large Connected` = n_large_connected,
+          `Large Unconnected` = n_large_unconnected,
+          `Small Connected` = n_small_connected,
+          `Small Unconnected` = n_small_unconnected) 
+
+size_data <- size_data %>%
+  mutate(`Large Connected` = ifelse(`Large Connected` > 9, round(`Large Connected`, 0), round(`Large Connected`, 2)),
+         `Large Unconnected` = ifelse(`Large Unconnected` > 9, round(`Large Unconnected`, 0), round(`Large Unconnected`, 2)),
+         `Small Connected` = ifelse(`Small Connected` > 9, round(`Small Connected`, 0), round(`Small Connected`, 2)),
+         `Small Unconnected` = ifelse(`Small Unconnected` > 9, round(`Small Unconnected`, 0), round(`Small Unconnected`, 2))) %>%
+  mutate(`Large Connected` = as.character(`Large Connected`),
+         `Large Unconnected` = as.character(`Large Unconnected`),
+         `Small Connected` = as.character(`Small Connected`),
+         `Small Unconnected` = as.character(`Small Unconnected`))
+
+knitr::kable(size_data, format = "latex",
+             col.names = c("Variable", "Overlap", "No Overlap", "Overlap", "No Overlap"),
+             caption = "Hospital Characteristics by Connection and Size\\label{size_characteristics}",
+             row.names = FALSE,
+             table.envir="table",
+             digits=2,
+             booktabs=TRUE,
+             escape=F,
+             align=c("l","c","c","c","c"),
+             position="ht!") %>%
+  kable_styling(full_width=F) %>%
+  add_header_above(c(" " = 1, "Large Hospitals" = 2, "Small Hospitals" = 2)) %>%
+  pack_rows("Quality", 1, 1, indent = FALSE) %>%
+  pack_rows("Investment", 2, 4, indent = FALSE) %>%
+  pack_rows("Concentration of Services", 5, 6, indent = FALSE) %>%
+  pack_rows("Patient Characteristics", 7, 9, indent = FALSE) %>%
+  pack_rows("Facilities", 10, 11, indent = FALSE) %>%
+  write("Objects//size_characteristics.tex")
+
+# Create table of characteristics for connected hospitals by system affiliation
+sys_connected <- hospital_connected_pairs %>%
+  filter(gen_gen==1) %>%
+  filter(!is.na(filer_sysid)) %>%
+  distinct(TaxYr, filer_id) %>%
+  mutate(group = "Sys Connected") %>%
+  select(TaxYr, filer_id, group)
+n_sys_connected <- nrow(distinct(sys_connected, filer_id))
+
+nosys_connected <- hospital_connected_pairs %>%
+  filter(gen_gen==1) %>%
+  filter(is.na(filer_sysid)) %>%
+  distinct(TaxYr, filer_id) %>%
+  mutate(group = "No Sys Connected") %>%
+  select(TaxYr, filer_id, group)
+n_nosys_connected <- nrow(distinct(nosys_connected, filer_id))
+
+sys_unconnected <- filer_data %>%
+  filter(connected==0) %>%
+  filter(!is.na(SYSID)) %>%
+  mutate(group = "Sys Unconnected") %>%
+  distinct(TaxYr, filer_id, group)
+n_sys_unconnected <- nrow(distinct(sys_unconnected, filer_id))
+
+nosys_unconnected <- filer_data %>%
+  filter(connected==0) %>%
+  filter(is.na(SYSID)) %>%
+  mutate(group = "No Sys Unconnected") %>%
+  distinct(TaxYr, filer_id, group)
+n_nosys_unconnected <- nrow(distinct(nosys_unconnected, filer_id))
+
+sys_data <- rbind(sys_connected, nosys_connected, sys_unconnected, nosys_unconnected)
+
+AHA_variables <- AHA %>%
+  select(YEAR, ID, GENBD, PEDBD, OBBD, MSICBD, CICBD, NICBD, NINTBD, PEDICBD,
+         BRNBD, SPCICBD, REHABBD, OTHICBD, ACULTBD, ALCHBD, PSYBD, SNBD88, ICFBD88,
+         OTHLBD94, OTHBD94, HOSPBD,
+         FTMT, FTRNTF,
+         ICLABHOS, ACLABHOS, EHLTH,
+         MCDDCH, MCRDCH, MCRNUM)
+
+# join to the size_data
+sys_data <- sys_data %>%
+  mutate(TaxYr = as.numeric(TaxYr)) %>%
+  left_join(AHA_variables, by = c("TaxYr"="YEAR", "filer_id"="ID"))
+
+# join to cms data
+sys_data <- sys_data %>%
+  left_join(mcare, by = c("MCRNUM"="Rndrng_Prvdr_CCN", "TaxYr"="year"))
+
+# join hcris to size_data
+sys_data <- sys_data %>%
+  left_join(hcris, by = c("MCRNUM"="provider_number", "TaxYr"="year"))
+
+# join hosp compare to size_data 
+sys_data <- sys_data %>%
+  left_join(hosp_compare, by = c("MCRNUM"="provider_id", "TaxYr"="year"))
+
+# Create bed concentration measure
+sys_data <- sys_data %>%
+  mutate(bed_conc = (GENBD/HOSPBD)^2 + (PEDBD/HOSPBD)^2 + (OBBD/HOSPBD)^2 + (MSICBD/HOSPBD)^2 + (CICBD/HOSPBD)^2 + (NICBD/HOSPBD)^2 + (NINTBD/HOSPBD)^2 + 
+           (PEDICBD/HOSPBD)^2 + (BRNBD/HOSPBD)^2 + (SPCICBD/HOSPBD)^2 + (OTHICBD/HOSPBD)^2 + (REHABBD/HOSPBD)^2 + (ALCHBD/HOSPBD)^2 + 
+           (PSYBD/HOSPBD)^2 + (SNBD88/HOSPBD)^2 + (ICFBD88/HOSPBD)^2 + (ACULTBD/HOSPBD)^2 + (OTHLBD94/HOSPBD)^2 + (OTHBD94/HOSPBD)^2)
+
+# Create patient services concentration
+sys_data <- sys_data %>%
+  mutate(cancer = Bene_CC_PH_Cancer6_V2_Pct,
+         kidney = Bene_CC_PH_CKD_V2_Pct,
+         copd = Bene_CC_PH_COPD_V2_Pct,
+         heart = Bene_CC_PH_IschemicHeart_V2_Pct) %>%
+  mutate(pat_conc = (cancer)^2 + (kidney)^2 + (copd)^2 + (heart)^2)
+
+# Create variables for percent of discharges medicare and medicare from HCRIS
+sys_data <- sys_data %>%
+  mutate(perc_mcare = ifelse(!is.na(tot_discharges) & tot_discharges > 0, mcare_discharges / tot_discharges, NA),
+         perc_mcaid = ifelse(!is.na(tot_discharges) & tot_discharges > 0, mcaid_discharges / tot_discharges, NA)) 
+
+# indicators for NICU
+sys_data <- sys_data %>%
+  mutate(NICBD = ifelse(!is.na(NICBD) & NICBD > 0, 1, 0))
+
+
+# Create table summarising variables
+sys_data <- sys_data %>%
+  group_by(group) %>%
+  summarise_at(c("Overall Hospital Rating"="hospital_overall_rating",
+                 "Health IT Purchases" = "HIT_purch",
+                 "Fixed Equipment Purchases" = "fixedequipment_purch",
+                 "Moveable Equipment Purchases" = "movableequipment_purch",
+                 "Concentration of Services (Beds)" = "bed_conc",
+                 "Concentration of Services (Conditions)" = "pat_conc",
+                 "Percent of Discharges Medicare" = "perc_mcare",
+                 "Percent of Discharges Medicaid" = "perc_mcaid",
+                 "Patient Risk Score" = "Bene_Avg_Risk_Scre",
+                 "Has a NICU" = "NICBD",
+                 "Has a Cath Lab" = "ACLABHOS"), list(mean), na.rm=T) %>%
+  t() %>%
+  as.data.frame() %>%
+  # make row names into its own column
+  tibble::rownames_to_column("Variable") 
+colnames(sys_data) <- sys_data[1,]
+sys_data <- sys_data %>%
+  filter(group!="group") %>%
+  mutate_at(vars(-group), as.numeric) %>%
+  add_row(group = "Num. Hospitals", 
+          `No Sys Connected` = n_nosys_connected,
+          `No Sys Unconnected` = n_nosys_unconnected,
+          `Sys Connected` = n_sys_connected,
+          `Sys Unconnected` = n_sys_unconnected) 
+
+sys_data <- sys_data %>%
+  mutate(`No Sys Connected` = ifelse(`No Sys Connected` > 9, round(`No Sys Connected`, 0), round(`No Sys Connected`, 2)),
+         `No Sys Unconnected` = ifelse(`No Sys Unconnected` > 9, round(`No Sys Unconnected`, 0), round(`No Sys Unconnected`, 2)),
+         `Sys Connected` = ifelse(`Sys Connected` > 9, round(`Sys Connected`, 0), round(`Sys Connected`, 2)),
+         `Sys Unconnected` = ifelse(`Sys Unconnected` > 9, round(`Sys Unconnected`, 0), round(`Sys Unconnected`, 2))) %>%
+  mutate(`No Sys Connected` = as.character(`No Sys Connected`),
+         `No Sys Unconnected` = as.character(`No Sys Unconnected`),
+         `Sys Connected` = as.character(`Sys Connected`),
+         `Sys Unconnected` = as.character(`Sys Unconnected`))
+
+knitr::kable(sys_data, format = "latex",
+             col.names = c("Variable", "Overlap", "No Overlap", "Overlap", "No Overlap"),
+             caption = "Hospital Characteristics by Connection and System Affiliation\\label{sys_characteristics}",
+             row.names = FALSE,
+             table.envir="table",
+             digits=2,
+             booktabs=TRUE,
+             escape=F,
+             align=c("l","c","c","c","c"),
+             position="ht!") %>%
+  kable_styling(full_width=F) %>%
+  add_header_above(c(" " = 1, "Not in System" = 2, "In System" = 2)) %>%
+  pack_rows("Quality", 1, 1, indent = FALSE) %>%
+  pack_rows("Investment", 2, 4, indent = FALSE) %>%
+  pack_rows("Concentration of Services", 5, 6, indent = FALSE) %>%
+  pack_rows("Patient Characteristics", 7, 9, indent = FALSE) %>%
+  pack_rows("Facilities", 10, 11, indent = FALSE) %>%
+  write("Objects//system_characteristics.tex")
+
 
 # Summarise different types of hospital connections
 
