@@ -13,6 +13,7 @@ replace_null <- function(x) {
   purrr::map(x, ~if(is.list(.x)) replace_null(.x) else .x)
 }
 
+
 # make a list of all folders to search through
 folders <- list.files(path = paste0(drive_path, "IRS_XML_990s/"), full.names = FALSE)
 
@@ -25,7 +26,7 @@ all_ein_data <- readRDS(paste0(created_data_path, "all_ein_data_scheduleH.rds"))
 all_people_data <- readRDS(paste0(created_data_path, "all_people_data_scheduleH.rds"))
 
 # loop through each folder
-for (folder in folders[25:75]) {
+for (folder in folders) {
   # make a list of all files in the folder
   files <- list.files(path = paste0(drive_path, "IRS_XML_990s/",folder), pattern = ".xml", full.names = FALSE)
   

@@ -5,18 +5,26 @@ library(stringr)
 library(readr)
 library(cdlTools)
 
+source("./Scripts/paths.R")
+
 # Read in EIN data from XMLs
 all_ein_data <- readRDS("CreatedData/all_ein_data_scheduleH.rds")
 
 # How many EINs are in this data?
 length(unique(all_ein_data$Filer.EIN))
 
-# Get rid of EINs that don't appear from at least 2018-2021
+# Make a variable capturing years present for each EIN
 all_ein_data <- all_ein_data %>%
-  mutate(present = ifelse(TaxYr>=2018 & TaxYr<=2021, 1, 0)) %>%
   group_by(Filer.EIN) %>%
-  filter(sum(present)>3) %>%
+  arrange(TaxYr) %>%
+  mutate(allyears = list(unique(TaxYr))) %>%
   ungroup()
+
+observe <- all_ein_data %>%
+  distinct(Filer.EIN, allyears)
+
+# frequency table of which years are included
+freq <- all_ein_data %>% distinct(Filer.EIN, allyears) %>% count(allyears)
 
 # Combine the variables that end with "BusinessNameLine1Txt"
 all_ein_data <- all_ein_data %>%
@@ -36,7 +44,8 @@ all_ein_data <- all_ein_data %>%
 # keep all variables with USAddress in the variable name
 ein_data <- all_ein_data %>%
   select(TaxYr, Filer.EIN, BusinessName1, BusinessName2, Filer.USAddress.AddressLine1Txt, Filer.USAddress.StateAbbreviationCd,
-         Filer.USAddress.ZIPCd, Filer.USAddress.CityNm)
+         Filer.USAddress.ZIPCd, Filer.USAddress.CityNm, allyears)
+
 
 # Work through any missing business names to determine most accurate name
 ein_data <- ein_data %>%
@@ -95,15 +104,20 @@ ein_data <- ein_data %>%
 ein_data <- ein_data %>%
   mutate(BusinessName = ifelse(is.na(BusinessName), paste(BusinessName1, BusinessName2, sep=" "), BusinessName))
 
+# Create indicator for group return
+ein_data <- ein_data %>%
+  mutate(group_return = ifelse(!is.na(BusinessName2) & str_detect(BusinessName2, "GROUP"),1,0)) %>%
+  mutate(group_return = ifelse(str_detect(BusinessName1, "GROUP"),1,group_return))
+
 # Keep relevant variables
 ein_data <- ein_data %>%
-  select(TaxYr, Filer.EIN, BusinessName, Filer.USAddress.AddressLine1Txt, Filer.USAddress.StateAbbreviationCd, Filer.USAddress.ZIPCd,
-         Filer.USAddress.CityNm) %>%
+  distinct(TaxYr, Filer.EIN, BusinessName, Filer.USAddress.AddressLine1Txt, Filer.USAddress.StateAbbreviationCd, Filer.USAddress.ZIPCd,
+         Filer.USAddress.CityNm, group_return, allyears) %>%
   mutate(BusinessName = str_trim(BusinessName))
 
 
 # Read in the AHA data
-AHA <- read_csv("RawData/AHAdata_20052023.csv")
+AHA <- read_csv(paste0(raw_data_path, "/AHAdata_20052023.csv"))
 
 # Keep relevant variables
 AHA <- AHA %>%
@@ -123,10 +137,18 @@ AHA <- AHA %>%
   mutate(MLOCADDR = toupper(MLOCADDR),
          MLOCCITY = toupper(MLOCCITY))
 
+# Remove commas from addresses
+AHA <- AHA %>%
+  mutate(MLOCADDR = str_remove_all(MLOCADDR, ","))
+
 # Convert zip codes into first five digits
 AHA <- AHA %>%
   mutate(MLOCZIP = str_sub(MLOCZIP, 1, 5)) %>%
   mutate(MLOCZIP = ifelse(nchar(MLOCZIP)==4, paste("0", MLOCZIP, sep=""), MLOCZIP))
+
+# limit the AHA data to 2015 and later and then remove year element
+AHA_match <- AHA %>%
+  distinct(ID, MNAME, MLOCADDR, FSTCD, MLOCCITY, MLOCZIP)
 
 # do the same for the tax data
 ein_data <- ein_data %>%
@@ -135,41 +157,39 @@ ein_data <- ein_data %>%
          Filer.USAddress.CityNm = toupper(Filer.USAddress.CityNm))
 
 ein_data <- ein_data %>%
+  mutate(Filer.USAddress.AddressLine1Txt = str_remove_all(Filer.USAddress.AddressLine1Txt, ","))
+
+ein_data <- ein_data %>%
   mutate(Filer.USAddress.ZIPCd = str_sub(Filer.USAddress.ZIPCd, 1, 5))
 
 # Convert tax state abbreviation to FIPS code
 ein_data <- ein_data %>%
   mutate(Filer.Stfips = fips(Filer.USAddress.StateAbbreviationCd))
 
-# limit the AHA data to 2016 and later
-AHA <- AHA %>%
-  filter(YEAR>=2016)
 
 # Remove "INC" and "Association" from EIN names
 ein_data <- ein_data %>%
-  mutate(BusinessName = str_remove_all(BusinessName, "INC|ASSOCIATION|ASSOC"))
+  mutate(BusinessName = str_remove_all(BusinessName, "\\bINC|ASSOCIATION|ASSOC"))
 
 # Join the data sets using stringdist_inner_join
 joined_data <- ein_data %>%
-  fuzzyjoin::stringdist_left_join(AHA, 
+  fuzzyjoin::stringdist_left_join(AHA_match, 
                                    by=c("BusinessName"="MNAME"), 
                                    method="jw", 
                                    max_dist=0.1,
                                    distance_col = "jw_dist")
 
 
-# remove the YEAR element
 joined_data <- joined_data %>%
-  select(-YEAR) %>%
   distinct()
 
 # Only keep matches in the same state
+observe <- joined_data %>%
+  filter(Filer.Stfips!=FSTCD)
 joined_data <- joined_data %>%
   filter(Filer.Stfips==FSTCD | is.na(FSTCD)) %>%
   distinct()
 
-joined_data <- joined_data %>%
-  distinct(TaxYr, Filer.EIN, ID, .keep_all = TRUE)
 
 # Remove non-matches (missing ID)
 joined_data <- joined_data %>%
@@ -196,6 +216,9 @@ observe <- joined_data %>%
 joined_data <- joined_data %>%
   filter(index>=2 | is.na(index))
 
+joined_data <- joined_data %>%
+  distinct(TaxYr, Filer.EIN, ID, .keep_all = TRUE)
+
 # look at multiples
 observe <- joined_data %>%
   group_by(Filer.EIN, TaxYr) %>%
@@ -219,6 +242,30 @@ joined_data <- joined_data %>%
   filter(n()==1) %>%
   ungroup()
 
+# now look at multiples not in the same year
+observe <- joined_data %>%
+  distinct(Filer.EIN, ID) %>%
+  group_by(Filer.EIN) %>%
+  filter(n()>1)
+  # 4 observations
+
+# drop these
+joined_data <- joined_data %>%
+  group_by(Filer.EIN) %>%
+  filter(length(unique(ID))==1) %>%
+  ungroup()
+
+# take random sample of 100 matches to verify
+sample <- joined_data %>%
+  sample_n(size=100, replace=FALSE) %>%
+  select(-allyears)
+write.csv(sample, file = paste0(created_data_path, "sample_matches.csv"))
+  # first of these had 100% match rate
+  # 7300 observations total
+
+joined_data <- joined_data %>%
+  distinct(Filer.EIN, ID)
+
 # Merge the joined data with the original EIN data
 ein_data <- ein_data %>%
   left_join(joined_data)
@@ -241,20 +288,15 @@ ein_data <- ein_data %>%
 
 distinct_matches <- ein_data %>%
   select(-TaxYr) %>%
-  distinct(Filer.EIN, ID, BusinessName, MNAME)
+  distinct(Filer.EIN, ID)
+  #2559 observations
 
 # How many matches?
 distinct_matches %>%
   filter(!is.na(ID)) %>%
   distinct(Filer.EIN) %>%
   nrow()
-  #1071
-
-# look at a random sample of 10 eins
-distinct_matches %>%
-  filter(!is.na(ID)) %>%
-  sample_n(10)
-
+  #1568
 
 
 
@@ -266,15 +308,13 @@ no_match <- ein_data %>%
 
 # merge to AHA based on similar addresses
 no_match_join <- no_match %>%
-  fuzzyjoin::stringdist_inner_join(AHA, 
+  fuzzyjoin::stringdist_inner_join(AHA_match, 
                                    by=c("Filer.USAddress.AddressLine1Txt"="MLOCADDR"), 
                                    method="jw", 
                                    max_dist=0.07,
                                    distance_col = "jw_dist")
 
-# get rid of year element
 no_match_join <- no_match_join %>%
-  select(-YEAR) %>%
   distinct()
 
 # Only keep matches in the same state
@@ -285,7 +325,7 @@ no_match_join <- no_match_join %>%
 # create variable for string distance between the names
 no_match_join <- no_match_join %>%
   mutate(name_dist = stringdist::stringdist(BusinessName, MNAME, method="jw")) %>%
-  filter(name_dist<0.4)
+  filter(name_dist<0.3)
 
 # select the match with the lowest name distance when there are multiple
 no_match_join <- no_match_join %>%
@@ -295,7 +335,7 @@ no_match_join <- no_match_join %>%
 
 # remove duplicates
 no_match_join <- no_match_join %>%
-  distinct(Filer.EIN, ID, BusinessName)
+  distinct(Filer.EIN, ID)
 
 distinct_matches <- bind_rows(distinct_matches, no_match_join)
 
@@ -308,7 +348,7 @@ distinct_matches <- distinct_matches %>%
 # look at those with no matches
 no_matches2 <- distinct_matches %>%
   filter(is.na(ID)) 
-
+  # 756 observations
 
 
 
@@ -497,12 +537,8 @@ distinct_matches <- distinct_matches %>%
          
 
 
-
-
-
 distinct_matches <- distinct_matches %>%
   distinct(Filer.EIN, ID, .keep_all=T)
-
 
 
 # how many matches?
@@ -510,15 +546,21 @@ distinct_matches %>%
   filter(!is.na(ID)) %>%
   distinct(Filer.EIN) %>%
   nrow()
-  # 1628!!!!
+  # 1904!!!!
 
 # duplicates in filer.ein?
-distinct_matches %>%
+observe <- distinct_matches %>%
   filter(!is.na(ID)) %>%
   distinct(Filer.EIN, ID) %>%
   group_by(Filer.EIN) %>%
   filter(n()>1)
-  # 0
+ # 3 EINs
+
+# Remove these
+distinct_matches <- distinct_matches %>%
+  group_by(Filer.EIN) %>%
+  filter(length(unique(ID))==1) %>%
+  ungroup()
 
 # duplicates in ID?
 observe <- distinct_matches %>%
@@ -527,21 +569,12 @@ observe <- distinct_matches %>%
   group_by(ID) %>%
   filter(n()>1)
 
-# deal with duplicates that are wrong
+# Remove these
 distinct_matches <- distinct_matches %>%
-  mutate(ID = ifelse(Filer.EIN==131624135, NA , ID),
-         ID = ifelse(Filer.EIN==222807681, NA , ID),
-         ID = ifelse(Filer.EIN==251550350, NA , ID),
-         ID = ifelse(Filer.EIN==465143606, 6230552 , ID),
-         ID = ifelse(Filer.EIN==231352203, 6232820 , ID),
-         ID = ifelse(Filer.EIN==560585243, NA , ID),
-         ID = ifelse(Filer.EIN==331216751, NA , ID),
-         ID = ifelse(Filer.EIN==351869951, NA , ID),
-         ID = ifelse(Filer.EIN==391264986, 6451580 , ID),
-         ID = ifelse(Filer.EIN==611362001, NA, ID),
-         ID = ifelse(Filer.EIN==610920842, NA, ID),
-         ID = ifelse(Filer.EIN==454394739, 6230456, ID)) %>%
-  filter(Filer.EIN!=390807063 & Filer.EIN!=390902199)
+  group_by(ID) %>%
+  filter(length(unique(Filer.EIN))==1) %>%
+  ungroup()
+# now we have 1836 matches
 
 distinct_matches <- distinct_matches %>%
   distinct(Filer.EIN, ID)
@@ -549,8 +582,3 @@ distinct_matches <- distinct_matches %>%
 # save distinct ein, ID crosswalk
 saveRDS(distinct_matches, "CreatedData/updated_ein_aha_cw.rds")
 
-# how many unique EINs?
-cw %>%
-  filter(!is.na(ID)) %>%
-  distinct(Filer.EIN) %>%
-  nrow()
