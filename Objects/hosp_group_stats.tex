@@ -2,17 +2,19 @@
 
 \caption{Hospital Characteristics by Connections\label{tab:hosp_group_stats}}
 \centering
-\begin{tabular}[t]{lccc}
+\begin{tabular}[t]{lccccccc}
 \toprule
-Variable & Connected in Same HRR & Connected in Diff HRR & Not Connected\\
+Sample of Hosp. & Num. Hospitals & Num. Beds & General & In System & Academic & Num. Physicians & Num. Nurses\\
 \midrule
-Num. Beds & 171.26 & 188.1 & 96.63\\
-General & 0.92 & 0.91 & 0.93\\
-In System & 0.55 & 0.62 & 0.51\\
-Academic & 0.35 & 0.43 & 0.18\\
-Num. Physicians & 378.37 & 456.83 & 190.74\\
-Num. Nurses & 290.37 & 325.43 & 141.18\\
-N & 95 & 786 & 197\\
+\addlinespace[0.3em]
+\multicolumn{8}{l}{\textbf{In Same HRR}}\\
+\hspace{1em}Become Connected & 48 & 146 & 0.96 & 0.55 & 0.34 & 408 & 217\\
+\hspace{1em}Always Connected & 52 & 278 & 0.89 & 0.37 & 0.55 & 373 & 577\\
+\addlinespace[0.3em]
+\multicolumn{8}{l}{\textbf{In Different HRR}}\\
+\hspace{1em}Become Connected & 246 & 155 & 0.94 & 0.57 & 0.36 & 1,009 & 252\\
+\hspace{1em}Always Connected & 446 & 193 & 0.92 & 0.62 & 0.44 & 525 & 344\\
+Never Connected & 232 & 102 & 0.92 & 0.54 & 0.22 & 322 & 158\\
 \bottomrule
 \end{tabular}
 \end{table}
