@@ -10,7 +10,7 @@ source("./Scripts/paths.R")
 all_people_data <- readRDS(paste0(created_data_path, "/all_people_data_scheduleH.rds"))
 cw <- readRDS(paste0(created_data_path, "/updated_ein_aha_cw.rds"))
 
-# only keep observations where EIN is found in either ein_hosp or ein_sys
+# only keep observations where EIN is found in the crosswalk
 all_people_data <- all_people_data %>%
   filter(Filer.EIN %in% cw$Filer.EIN)
 

@@ -146,8 +146,11 @@ AHA <- AHA %>%
   mutate(MLOCZIP = str_sub(MLOCZIP, 1, 5)) %>%
   mutate(MLOCZIP = ifelse(nchar(MLOCZIP)==4, paste("0", MLOCZIP, sep=""), MLOCZIP))
 
-# limit the AHA data to 2015 and later and then remove year element
+# limit to hospitals present in the AHA data in the years we care about
 AHA_match <- AHA %>%
+  mutate(count = ifelse(YEAR>2016 & YEAR<2023,1,0)) %>%
+  group_by(ID) %>%
+  filter(sum(count)>0) %>%
   distinct(ID, MNAME, MLOCADDR, FSTCD, MLOCCITY, MLOCZIP)
 
 # do the same for the tax data
@@ -184,8 +187,6 @@ joined_data <- joined_data %>%
   distinct()
 
 # Only keep matches in the same state
-observe <- joined_data %>%
-  filter(Filer.Stfips!=FSTCD)
 joined_data <- joined_data %>%
   filter(Filer.Stfips==FSTCD | is.na(FSTCD)) %>%
   distinct()
@@ -261,10 +262,11 @@ sample <- joined_data %>%
   select(-allyears)
 write.csv(sample, file = paste0(created_data_path, "sample_matches.csv"))
   # first of these had 100% match rate
-  # 7300 observations total
+  # 8600 observations total
 
 joined_data <- joined_data %>%
   distinct(Filer.EIN, ID)
+  # 1558
 
 # Merge the joined data with the original EIN data
 ein_data <- ein_data %>%
@@ -296,7 +298,7 @@ distinct_matches %>%
   filter(!is.na(ID)) %>%
   distinct(Filer.EIN) %>%
   nrow()
-  #1568
+  #1558
 
 
 
@@ -338,6 +340,7 @@ no_match_join <- no_match_join %>%
   distinct(Filer.EIN, ID)
 
 distinct_matches <- bind_rows(distinct_matches, no_match_join)
+# 2793 obs
 
 # remove observations with NA if they have a non-NA value
 distinct_matches <- distinct_matches %>%
@@ -348,7 +351,7 @@ distinct_matches <- distinct_matches %>%
 # look at those with no matches
 no_matches2 <- distinct_matches %>%
   filter(is.na(ID)) 
-  # 756 observations
+  # 767 observations
 
 
 
@@ -546,7 +549,7 @@ distinct_matches %>%
   filter(!is.na(ID)) %>%
   distinct(Filer.EIN) %>%
   nrow()
-  # 1904!!!!
+  # 1893!!!!
 
 # duplicates in filer.ein?
 observe <- distinct_matches %>%
@@ -554,7 +557,7 @@ observe <- distinct_matches %>%
   distinct(Filer.EIN, ID) %>%
   group_by(Filer.EIN) %>%
   filter(n()>1)
- # 3 EINs
+ # 0 EINs
 
 # Remove these
 distinct_matches <- distinct_matches %>%
@@ -574,11 +577,12 @@ distinct_matches <- distinct_matches %>%
   group_by(ID) %>%
   filter(length(unique(Filer.EIN))==1) %>%
   ungroup()
-# now we have 1836 matches
+# now we have 1824 matches
 
 distinct_matches <- distinct_matches %>%
   distinct(Filer.EIN, ID)
 
 # save distinct ein, ID crosswalk
 saveRDS(distinct_matches, "CreatedData/updated_ein_aha_cw.rds")
+
 

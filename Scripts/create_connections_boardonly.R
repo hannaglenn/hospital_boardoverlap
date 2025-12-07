@@ -349,28 +349,28 @@ connections <- connections %>%
 AHA <- read_csv(paste0(raw_data_path, "\\AHAdata_20052023.csv")) 
 
 AHA_hrr <- AHA %>%
-  select(ID, YEAR, HRRCODE, SYSID, MNAME, SERV) %>%
+  select(ID, YEAR, HRRCODE, SYSID, MNAME, SERV, LAT, LONG) %>%
   filter(YEAR>=2015 & YEAR<=2023) %>%
   mutate(YEAR = as.character(YEAR))
 
 connections <- connections %>%
   left_join(AHA_hrr, by=c("Filer.ID"="ID", "TaxYr"="YEAR")) %>%
-  rename(filer.hrr=HRRCODE, filer.sysid=SYSID, filer.name=MNAME, filer.type=SERV)
+  rename(filer.hrr=HRRCODE, filer.sysid=SYSID, filer.name=MNAME, filer.type=SERV, filer.lat=LAT, filer.long=LONG)
 
 # fill missing variables when possible
 connections <- connections %>%
   group_by(Filer.ID) %>%
-  fill(filer.hrr, filer.type, filer.name, .direction="downup") %>%
+  fill(filer.hrr, filer.type, filer.name, filer.lat, filer.long, .direction="downup") %>%
   ungroup()
 
 connections <- connections %>%
   left_join(AHA_hrr, by=c("other.id"="ID", "TaxYr"="YEAR")) %>%
-  rename(other.hrr=HRRCODE, other.sysid=SYSID, other.name=MNAME, other.type=SERV)
+  rename(other.hrr=HRRCODE, other.sysid=SYSID, other.name=MNAME, other.type=SERV, other.lat=LAT, other.long=LONG)
 
 # fill missing variables when possible
 connections <- connections %>%
   group_by(other.id) %>%
-  fill(other.hrr, other.type, other.name, .direction="downup") %>%
+  fill(other.hrr, other.type, other.name, other.lat, other.long, .direction="downup") %>%
   ungroup()
 
 # Create classifications for each connection type
@@ -415,6 +415,13 @@ people_connections <- people_connections %>%
 saveRDS(people_connections, file=paste0(created_data_path, "people_connections_boardonly.rds"))
 
 # summarize connections at the hospital level -----------------------------------------------
+# create hospital-level connections data set for making a map showing the connections
+hospital_connections <- connections %>%
+  distinct(TaxYr, Filer.EIN, Filer.ID, filer.hrr, filer.sysid, filer.name, filer.type, filer.lat, filer.long, 
+           other_ein, other.id, other.hrr, other.sysid, other.name, other.type, other.lat, other.long,
+           sameHRR_competing, sameHRR_noncompeting, diffHRR_competing, diffHRR_noncompeting) 
+saveRDS(hospital_connections, file=paste0(created_data_path, "hospital_connections_boardonly.rds"))
+
 hospital_connections <- connections %>%
   filter(!is.na(competitor)) %>%
   group_by(TaxYr, Filer.EIN) %>%

@@ -258,6 +258,9 @@ identify_common_members <- function(data) {
 
 
 
+
+
+
 # Clean up the names ----------------------------------------------------------------------------------------
 
 # Read in cleaned up version of names found in 990 tax forms
@@ -307,19 +310,67 @@ people <- assign_person_id(people)
 # Create variables of board members connected to multiple EINs ---------------------------------------------------
 connections <- identify_common_members(people)
 
-# separate other_eins into multiple columns
-connections <- connections %>%
-  separate_wider_delim(other_eins, delim = ",", names_sep = "", too_few="align_start")
+# only keep EINs that are present in enough years
+ein_keep <- connections %>%
+  distinct(Filer.EIN, TaxYr) %>%
+  mutate(count=ifelse(TaxYr %in% c(2017,2018,2019,2020,2021),1,0)) %>%
+  group_by(Filer.EIN) %>%
+  filter(sum(count)>=5) %>%
+  ungroup() %>%
+  distinct(Filer.EIN)
 
-# wide to long in other_eins
 connections <- connections %>%
-  pivot_longer(cols = starts_with("other_eins"), names_to = "num_board", values_to = "other_ein")
+  filter(Filer.EIN %in% unique(ein_keep$Filer.EIN))
 
-# Remove columns with NA
+# pivot longer
+connections <- connections %>%
+  separate_wider_delim(cols = "other_eins", delim=",", names_sep = "", too_few = "align_start")
+
+connections <- connections %>%
+  pivot_longer(cols=starts_with("other_eins"), names_to="other", values_to="other_ein")
+
+# Remove columns with NA, only keep actual connections
 connections <- connections %>%
   mutate(other_ein = str_trim(other_ein)) %>%
-  filter(!is.na(other_ein)) %>%
-  select(TaxYr, name_cleaned, gender, position, doctor, nurse, other_doctor, ha, nonvoting, Filer.EIN, other_ein)
+  filter(!is.na(other_ein))
+
+# calculate initial overlap of boards for hospital pairs
+filer_board <- connections %>%
+  group_by(TaxYr, Filer.EIN) %>%
+  summarise(board = list(unique(name_cleaned)))
+
+connections <- connections %>%
+  left_join(filer_board, by=c("TaxYr", "Filer.EIN")) %>%
+  rename(filer_board = board)
+connections <- connections %>%
+  left_join(filer_board, by=c("TaxYr", "other_ein"="Filer.EIN")) %>%
+  rename(other_board = board)
+
+connections <- connections %>%
+  rowwise() %>%
+  mutate(overlap_count = length(intersect(filer_board, other_board)),
+         filer_size = length(filer_board)) %>%
+  mutate(overlap_percent = overlap_count / filer_size * 100) %>%
+  ungroup()
+
+connections <- connections %>%
+  select(-filer_board, -other_board)
+
+ein_positions <- people %>%
+  mutate(position = ifelse(position=="board", "board", "exec")) %>%
+  distinct(TaxYr, person_id, position) %>%
+  group_by(TaxYr, person_id) %>%
+  summarise(positions = list(position)) %>%
+  ungroup() %>%
+  mutate(person_positions = ifelse(positions=="board", "board only", NA)) %>%
+  mutate(person_positions = ifelse(positions=="exec", "exec only", person_positions)) %>%
+  mutate(person_positions = ifelse(is.na(person_positions), "board and exec", person_positions)) %>%
+  distinct(TaxYr, person_id, person_positions)
+
+# join to connections data
+connections <- connections %>%
+  left_join(ein_positions)
+
 
 # Join each EIN to their AHA
 cw <- readRDS(paste0(created_data_path, "updated_ein_aha_cw.rds"))
@@ -331,7 +382,7 @@ connections <- connections %>%
   rename(other.id = ID)
 
 # create hospital level data set to merge back to later
-hospital_data <- people %>%
+hospital_data <- connections %>%
   distinct(TaxYr, Filer.EIN) %>%
   left_join(cw) %>%
   rename(Filer.ID=ID)
@@ -345,47 +396,67 @@ connections <- connections %>%
 AHA <- read_csv(paste0(raw_data_path, "\\AHAdata_20052023.csv")) 
 
 AHA_hrr <- AHA %>%
-  select(ID, YEAR, HRRCODE, SYSID, MNAME, SERV, LAT, LONG) %>%
+  select(ID, YEAR, HRRCODE, SYSID, NETNAME, MNAME, SERV, LAT, LONG) %>%
   filter(YEAR>=2015 & YEAR<=2023) %>%
-  mutate(YEAR = as.character(YEAR))
+  mutate(YEAR = as.character(YEAR)) %>%
+  distinct(ID, YEAR, .keep_all = TRUE)
+
+# complete AHA data for variables we can extrapolate
+AHA_hrr <- AHA_hrr %>%
+  group_by(ID) %>%
+  mutate(YEAR=as.numeric(YEAR)) %>%
+  complete(YEAR = c(2015:2023)) %>%
+  fill(HRRCODE, MNAME, SERV, LAT, LONG, .direction="downup") %>%
+  mutate(YEAR=as.character(YEAR))
 
 connections <- connections %>%
   left_join(AHA_hrr, by=c("Filer.ID"="ID", "TaxYr"="YEAR")) %>%
-  rename(filer.hrr=HRRCODE, filer.sysid=SYSID, filer.name=MNAME, filer.type=SERV, filer.lat=LAT, filer.long=LONG)
-
-# fill missing variables when possible
-connections <- connections %>%
-  group_by(Filer.ID) %>%
-  fill(filer.hrr, filer.type, filer.name,filer.lat, filer.long, .direction="downup") %>%
-  ungroup()
+  rename(filer.hrr=HRRCODE, filer.sysid=SYSID, filer.name=MNAME, filer.type=SERV, filer.lat=LAT, filer.long=LONG, filer.net = NETNAME)
 
 connections <- connections %>%
   left_join(AHA_hrr, by=c("other.id"="ID", "TaxYr"="YEAR")) %>%
-  rename(other.hrr=HRRCODE, other.sysid=SYSID, other.name=MNAME, other.type=SERV, other.lat=LAT, other.long=LONG)
+  rename(other.hrr=HRRCODE, other.sysid=SYSID, other.name=MNAME, other.type=SERV, other.lat=LAT, other.long=LONG, other.net=NETNAME)
 
-# fill missing variables when possible
+# Create classifications for each affiliation type
+# "formal" means they are in the same system or network
+# "informal" means they share a large portion of exec and board team (management consolidation)
+# "partnership" means they just share a small number of board members
+# the categories are mutually exclusive
+
+# pick up on shared systems using name distance metric
 connections <- connections %>%
-  group_by(other.id) %>%
-  fill(other.hrr, other.type, other.name, other.lat, other.long, .direction="downup") %>%
-  ungroup()
+  mutate(name_dist = stringdist::stringdist(str_extract(filer.name,"[A-Za-z]+\\s"), str_extract(other.name,"[A-Za-z]+\\s"), method = "jw")) 
 
-# Create classifications for each connection type
-
-# define competitor vs. non-competitor (like hospitals, regardless of location)
+# create categories
 connections <- connections %>%
-  mutate(name_dist = stringdist::stringdist(str_extract(filer.name,"[A-Za-z]+\\s"), str_extract(other.name,"[A-Za-z]+\\s"), method = "jw")) %>%
-  mutate(competitor = ifelse(name_dist>0 & (filer.sysid!=other.sysid | is.na(filer.sysid) | is.na(other.sysid)), 1, 0)) %>%
-  mutate(missing_hrr_info = ifelse(is.na(competitor),1,0))
+  mutate(affiliation = ifelse(filer.sysid==other.sysid | filer.net==other.net | name_dist==0, "formal", NA)) %>%
+  mutate(affiliation = ifelse(is.na(affiliation) & overlap_percent>=70, "informal", affiliation)) %>%
+  mutate(affiliation = ifelse(is.na(affiliation) & overlap_percent>0, "partnership", affiliation)) %>%
+  mutate(affiliation = ifelse(is.na(affiliation), "None", affiliation))
 
-# Define indicators to describe the 4 types of connections
-connections <- connections %>%
-  mutate(sameHRR_competing = ifelse(filer.hrr==other.hrr & competitor==1, 1, 0),
-         diffHRR_competing = ifelse(filer.hrr!=other.hrr & competitor==1, 1, 0),
-         sameHRR_noncompeting = ifelse(filer.hrr==other.hrr & competitor==0, 1, 0),
-         diffHRR_noncompeting = ifelse(filer.hrr!=other.hrr & competitor==0, 1, 0))
+# look at frequencies:
+aff_freq <- connections %>%
+  group_by(TaxYr) %>%
+  count(affiliation)
+
+# create connection indicators for same or different HRR
+create_affiliation_indicators <- function(data, affiliation_col, filer_hrr_col, other_hrr_col, categories) {
+  for (cat in categories) {
+    same_col <- paste0(cat, "_sameHRR")
+    diff_col <- paste0(cat, "_diffHRR")
+    
+    data[[same_col]] <- ifelse(data[[affiliation_col]] == cat & data[[filer_hrr_col]] == data[[other_hrr_col]], 1, 0)
+    data[[diff_col]] <- ifelse(data[[affiliation_col]] == cat & data[[filer_hrr_col]] != data[[other_hrr_col]], 1, 0)
+  }
+  return(data)
+}
+
+# Example usage:
+categories <- c("formal", "informal", "partnership")
+connections <- create_affiliation_indicators(connections, "affiliation", "filer.hrr", "other.hrr", categories)
 
 people_connections <- connections %>%
-  group_by(TaxYr, Filer.EIN, name_cleaned) %>%
+  group_by(TaxYr, Filer.EIN, person_id) %>%
   summarise(
     doctor = max(doctor, na.rm = TRUE),
     nurse = max(nurse, na.rm = TRUE),
@@ -394,18 +465,14 @@ people_connections <- connections %>%
     nonvoting = max(nonvoting, na.rm = TRUE),
     position = first(position),  # or paste(unique(position), collapse = ";")
     gender = first(gender),
-    sameHRR_competing = max(sameHRR_competing, na.rm = TRUE),
-    diffHRR_competing = max(diffHRR_competing, na.rm = TRUE),
-    sameHRR_noncompeting = max(sameHRR_noncompeting, na.rm = TRUE),
-    diffHRR_noncompeting = max(diffHRR_noncompeting, na.rm = TRUE)
+    person_positions = first(person_positions),
+    formal_sameHRR = max(formal_sameHRR),
+    formal_diffHRR = max(formal_diffHRR),
+    informal_sameHRR = max(informal_sameHRR),
+    informal_diffHRR = max(informal_diffHRR),
+    partnership_sameHRR = max(partnership_sameHRR),
+    partnership_diffHRR = max(partnership_diffHRR)
   )
-
-people_connections <- people_connections %>%
-  ungroup() %>%
-  mutate(sameHRR_competing = ifelse(sameHRR_competing=="-Inf",0,sameHRR_competing),
-         sameHRR_noncompeting = ifelse(sameHRR_noncompeting=="-Inf",0,sameHRR_noncompeting),
-         diffHRR_competing = ifelse(diffHRR_competing=="-Inf",0,diffHRR_competing),
-         diffHRR_noncompeting = ifelse(diffHRR_noncompeting=="-Inf",0,diffHRR_noncompeting))
 
 # save connections data
 saveRDS(people_connections, file=paste0(created_data_path, "people_connections_boardandexec.rds"))
@@ -413,74 +480,65 @@ saveRDS(people_connections, file=paste0(created_data_path, "people_connections_b
 # summarize connections at the hospital level -----------------------------------------------
 # create hospital-level connections data set for making a map showing the connections
 hospital_connections <- connections %>%
-  distinct(TaxYr, Filer.EIN, Filer.ID, filer.hrr, filer.sysid, filer.name, filer.type, filer.lat, filer.long, 
-           other_ein, other.id, other.hrr, other.sysid, other.name, other.type, other.lat, other.long,
-           sameHRR_competing, sameHRR_noncompeting, diffHRR_competing, diffHRR_noncompeting) 
+  distinct(TaxYr, Filer.EIN, Filer.ID, filer.hrr, filer.sysid, filer.name, filer.type, filer.lat, filer.long, filer.net, 
+           other_ein, other.id, other.hrr, other.sysid, other.name, other.type, other.lat, other.long, other.net,
+           formal_sameHRR, formal_diffHRR, informal_sameHRR, informal_diffHRR, partnership_sameHRR, partnership_diffHRR, 
+           overlap_count, overlap_percent) 
 saveRDS(hospital_connections, file=paste0(created_data_path, "hospital_connections_boardandexec.rds"))
 
 hospital_connections <- connections %>%
-  filter(!is.na(competitor)) %>%
+  filter(other_ein!="") %>%
   group_by(TaxYr, Filer.EIN) %>%
-  mutate(any_sameHRR_competing = max(sameHRR_competing, na.rm=T),
-         perc_sameHRR_competing = mean(sameHRR_competing, na.rm=T)) %>%
-  mutate(any_diffHRR_competing = max(diffHRR_competing, na.rm=T),
-         perc_diffHRR_competing = mean(diffHRR_competing, na.rm=T)) %>%
-  mutate(any_sameHRR_noncompeting = max(sameHRR_noncompeting, na.rm=T),
-         perc_sameHRR_noncompeting = mean(sameHRR_noncompeting, na.rm=T)) %>%
-  mutate(any_diffHRR_noncompeting = max(diffHRR_noncompeting, na.rm=T),
-         perc_diffHRR_noncompeting = mean(diffHRR_noncompeting, na.rm=T)) %>%
+  mutate(any_formal_sameHRR = max(formal_sameHRR),
+         any_formal_diffHRR = max(formal_diffHRR),
+         any_informal_sameHRR = max(informal_sameHRR),
+         any_informal_diffHRR = max(informal_diffHRR),
+         any_partnership_sameHRR = max(partnership_sameHRR),
+         any_partnership_diffHRR = max(partnership_diffHRR)) %>%
   ungroup() %>%
-  distinct(TaxYr, Filer.EIN, 
-           any_sameHRR_competing, perc_sameHRR_competing,
-           any_diffHRR_competing, perc_diffHRR_competing,
-           any_sameHRR_noncompeting, perc_sameHRR_noncompeting,
-           any_diffHRR_noncompeting, perc_diffHRR_noncompeting)
+  distinct(TaxYr, Filer.EIN,
+           any_formal_sameHRR, any_formal_diffHRR,
+           any_informal_sameHRR, any_informal_diffHRR,
+           any_partnership_sameHRR, any_partnership_diffHRR)
 
 
 # join back to hospital data
 hospital_data <- hospital_data %>%
-  left_join(hospital_connections, by=c("TaxYr", "Filer.EIN")) %>%
-  mutate(any_sameHRR_competing = ifelse(is.na(any_sameHRR_competing),0,any_sameHRR_competing),
-         perc_sameHRR_competing = ifelse(is.na(perc_sameHRR_competing),0,perc_sameHRR_competing),
-         any_sameHRR_noncompeting = ifelse(is.na(any_sameHRR_noncompeting),0,any_sameHRR_noncompeting),
-         perc_sameHRR_noncompeting = ifelse(is.na(perc_sameHRR_noncompeting),0,perc_sameHRR_noncompeting),
-         any_diffHRR_competing = ifelse(is.na(any_diffHRR_competing),0,any_diffHRR_competing),
-         perc_diffHRR_competing = ifelse(is.na(perc_diffHRR_competing),0,perc_diffHRR_competing),
-         any_diffHRR_noncompeting = ifelse(is.na(any_diffHRR_noncompeting),0,any_diffHRR_noncompeting),
-         perc_diffHRR_noncompeting = ifelse(is.na(perc_diffHRR_noncompeting),0,perc_diffHRR_noncompeting))
+  left_join(hospital_connections, by=c("TaxYr", "Filer.EIN"))
 
-
-# only keep hospitals present in 2017-2021
+# Change NAs to zeros
 hospital_data <- hospital_data %>%
-  mutate(count = ifelse(TaxYr %in% c(2017:2021),1,0)) %>%
-  group_by(Filer.EIN) %>%
-  filter(sum(count)==5) %>%
-  ungroup() %>%
-  mutate(TaxYr = as.numeric(TaxYr))
+  mutate(any_formal_sameHRR = ifelse(is.na(any_formal_sameHRR),0,any_formal_sameHRR),
+         any_formal_diffHRR = ifelse(is.na(any_formal_diffHRR),0,any_formal_diffHRR),
+         any_informal_sameHRR = ifelse(is.na(any_informal_sameHRR),0,any_informal_sameHRR),
+         any_informal_diffHRR = ifelse(is.na(any_informal_diffHRR),0,any_informal_diffHRR),
+         any_partnership_sameHRR = ifelse(is.na(any_partnership_sameHRR),0,any_partnership_sameHRR),
+         any_partnership_diffHRR = ifelse(is.na(any_partnership_diffHRR),0,any_partnership_diffHRR))
 
 
 # find the first year the hospital gained each type of connections (0 if not connected in the relevant way)
-minyr_sameHRR_comp <- hospital_data %>%
-  filter(any_sameHRR_competing==1) %>%
+minyr_sameHRR_partnership <- hospital_data %>%
+  filter(any_partnership_sameHRR==1) %>%
   group_by(Filer.EIN) %>%
-  mutate(minyr_sameHRR_comp = min(TaxYr)) %>%
+  mutate(minyr_sameHRR_part = min(TaxYr)) %>%
   ungroup() %>%
-  distinct(Filer.EIN, minyr_sameHRR_comp)
-minyr_diffHRR_comp <- hospital_data %>%
-  filter(any_diffHRR_competing==1) %>%
+  distinct(Filer.EIN, minyr_sameHRR_part)
+minyr_diffHRR_partnership <- hospital_data %>%
+  filter(any_partnership_diffHRR==1) %>%
   group_by(Filer.EIN) %>%
-  mutate(minyr_diffHRR_comp = min(TaxYr)) %>%
+  mutate(minyr_diffHRR_part = min(TaxYr)) %>%
   ungroup() %>%
-  distinct(Filer.EIN, minyr_diffHRR_comp)
+  distinct(Filer.EIN, minyr_diffHRR_part)
 
 # merge back to data
 hospital_data <- hospital_data %>%
-  left_join(minyr_sameHRR_comp, by="Filer.EIN") %>%
-  left_join(minyr_diffHRR_comp, by="Filer.EIN") 
+  left_join(minyr_sameHRR_partnership, by="Filer.EIN") %>%
+  left_join(minyr_diffHRR_partnership, by="Filer.EIN") 
 
 hospital_data <- hospital_data %>%
-  mutate(minyr_sameHRR_comp = ifelse(is.na(minyr_sameHRR_comp),0,minyr_sameHRR_comp),
-         minyr_diffHRR_comp = ifelse(is.na(minyr_diffHRR_comp),0,minyr_diffHRR_comp))
+  ungroup() %>%
+  mutate(minyr_sameHRR_part = ifelse(is.na(minyr_sameHRR_part),0,minyr_sameHRR_part)) %>%
+  mutate(minyr_diffHRR_part = ifelse(is.na(minyr_diffHRR_part),0,minyr_diffHRR_part))
 
 # Merge outcome variables
 AHA_variables <- AHA %>%
