@@ -678,20 +678,18 @@ outcome_graphs_relative <- outcome_graphs %>%
                  "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
   pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
   filter(rel_year<4 & rel_year>-4) 
-outcome_table_other <- outcome_table %>%
+outcome_graphs_other <- outcome_graphs %>%
   filter(is.na(rel_year)) %>%
   group_by(TaxYr, group) %>%
   summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
                  "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
-  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
-  group_by(group, variable) %>%
-  summarise(Pre=mean(mean))
+  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") 
 
-
+graphs <- bind_rows(outcome_graphs_relative, outcome_graphs_other)
 
 
 # graph for operating expenses
-tot_operating_exp <- graphs %>%
+graphs %>%
   filter(variable=="tot_operating_exp_m") %>%
   mutate(mean = mean/100000) %>%
   mutate(
@@ -722,10 +720,112 @@ tot_operating_exp <- graphs %>%
     data = data.frame(axis_type = "Relative Year", x = 0, xend = 0, y = 0, yend = 3000),
     aes(x = x, xend = xend, y = y, yend = yend),
     linetype = "dashed", color = "gray", inherit.aes = FALSE
-  )
+  ) %>%
+  ggsave(filename = paste0(objects_path, "tot_oper_exp_graph.pdf"), width = 6, height = 4, units = "in")
+
+# graph for percent medicaid and percent medicare
+
+library(dplyr)
+library(ggplot2)
+
+# Build plot
+(graphs %>%
+  filter(variable %in% c("perc_mcaid_m", "perc_mcare_m")) %>%
+  mutate(variable = ifelse(variable == "perc_mcaid_m", "Percent Medicaid", "Percent Medicare")) %>%
+  mutate(
+    axis_type = case_when(
+      group %in% c("Become Connected Same", "Become Connected Different") ~ "Relative Year",
+      group == "Never Connected" ~ "Year",
+      TRUE ~ "Unknown axis"
+    ),
+    x_display = dplyr::if_else(axis_type == "Relative Year", rel_year, TaxYr)
+  ) %>%
+  filter(!is.na(x_display)) %>%
+  ggplot(aes(x = x_display, y = mean, color = group, linetype = variable, shape = variable)) +
+  geom_line() +
+  geom_point(size = 2) +
+  facet_wrap(~ axis_type, scales = "free_x", nrow = 1) +
+  # Legends: color (Group) on top; shape + linetype (Patient type) below
+  scale_color_brewer(name = "Group", palette = "Dark2") +
+  scale_shape_manual(
+    name = "Patient type",
+    values = c("Percent Medicaid" = 16, "Percent Medicare" = 17)  # circle, triangle
+  ) +
+  scale_linetype_manual(
+    name = "Patient type",
+    values = c("Percent Medicaid" = "solid", "Percent Medicare" = "dashed")
+  ) +
+  labs(
+    x = NULL,                       # strip labels communicate the axis
+    y = "Patient Type\n"
+  ) +
+  theme_minimal(base_size = 12, base_family = "serif") +
+  theme(
+    legend.position = "bottom",      # stack legends vertically
+    legend.direction = "vertical",
+    strip.text = element_text(face = "bold"),
+    legend.key.width  = unit(18, "pt"),
+    legend.key.height = unit(14, "pt")
+  ) +
+  ylim(0, 0.5) +
+  # vertical marker (only in Relative Year facet)
+  geom_segment(
+    data = data.frame(axis_type = "Relative Year", x = -0.5, xend = -0.5, y = 0, yend = 0.5),
+    aes(x = x, xend = xend, y = y, yend = yend),
+    linetype = "dashed", color = "gray", size = 1, inherit.aes = FALSE
+  ) +
+  # Legend order: color first, then shape & linetype
+  guides(
+    color    = guide_legend(order = 1),
+    shape    = guide_legend(order = 2),
+    linetype = guide_legend(order = 2)
+  )) %>%
+  ggsave(filename = paste0(objects_path, "perc_patients_graphs.pdf"), width = 8, height = 4, units = "in")
 
 
-# I'm going to try to put it into a table instead of graphs, the graphs get to be too much
+# Save (PDF). Use cairo_pdf to handle fonts better; switch to PNG if needed.
+ggsave(
+  filename = paste0(objects_path, "perc_patients_graphs.pdf"),
+  plot = p,
+  width = 8, height = 4, units  width = 8, height = 4, units = "in",
+  device = cairo_pdf
+  
+
+# graph for bed concentration
+(graphs %>%
+    filter(variable=="bed_conc_m") %>%
+    mutate(
+      axis_type = case_when(
+        group %in% c("Become Connected Same", "Become Connected Different") ~ "Relative Year",
+        group == "Never Connected" ~ "Year",
+        TRUE ~ "Unknown axis"
+      ),
+      x_display = if_else(axis_type == "Relative Year", rel_year, TaxYr)
+    ) %>%
+    filter(!is.na(x_display)) %>%
+    ggplot(aes(x = x_display, y = mean, color = group, linetype = variable, shape = variable)) +
+    geom_line() +
+    geom_point(size = 2) +
+    facet_wrap(~ axis_type, scales = "free_x", nrow = 1) +
+    scale_color_brewer(palette = "Dark2") +
+    labs(
+      x = NULL,                       # Strip labels will communicate the axis
+      y = "Bed Concentration\n",
+      color = "Group",
+    ) +
+    theme_minimal(base_size = 12) +
+    theme(
+      legend.position = "bottom",
+      strip.text = element_text(face = "bold")
+    ) + ylim(0,1) + theme(element_text(family = "serif", size=13)) +
+    geom_segment(
+      data = data.frame(axis_type = "Relative Year", x = -0.5, xend = -0.5, y = 0, yend = 1),
+      aes(x = x, xend = xend, y = y, yend = yend),
+      linetype = "dashed", color = "gray", linewidth =1, inherit.aes = FALSE
+    ) + theme(legend.title = element_blank()))  %>%
+  ggsave(filename = paste0(objects_path, "bed_conc_graph.pdf"), width = 6, height = 4, units = "in")
+
+
 
 
 
