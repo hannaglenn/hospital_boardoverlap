@@ -15,6 +15,8 @@ library(did)
 
 source("./Scripts/paths.R")
 
+options(knitr.kable.NA = '')
+
 people_data <- readRDS(paste0(created_data_path, "people_connections_boardandexec.rds"))
 hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec.rds"))
 hospital_connections <- readRDS(paste0(created_data_path, "hospital_connections_boardandexec.rds"))
@@ -142,7 +144,6 @@ knitr::kable(stats,
              align=c("l","c","c","c","c", "c", "c"),
              position="ht!",
              linesep = "") %>%
-  add_header_above(c(" "=2, "Percent" =5)) %>%
   pack_rows(group_label = "Individuals", start_row = 1, end_row = 2) %>%
   pack_rows(group_label = "Hospital Teams", start_row = 3, end_row = 4) %>%
   write(file = paste0(objects_path, "boardandexec_people.tex"))
@@ -560,33 +561,184 @@ knitr::kable(stat,
   pack_rows("", 5, 5, indent = FALSE, latex_gap_space = "-0.3em") %>%
   write(file = paste0(objects_path, "hosp_group_stats.tex"))
 
-# graph: outcome variables by group------------------------------------------------------
+# table: outcome variables by group broken down by pre- and post------------------------------------------------------
 # define the groups
 hospital_data <- hospital_data %>%
-  mutate(group = ifelse(minyr_sameHRR_part>2017, "Become Connected Same", NA)) %>%
-  mutate(group = ifelse(is.na(group) & minyr_diffHRR_part>2017, "Become Connected Different", group)) %>%
-  mutate(group = ifelse(is.na(group) & always_diff==1, "Always Connected Different", group)) %>%
-  mutate(group = ifelse(is.na(group) & never_same==1 & never_diff==1, "Never Connected", group))
+  mutate(group = ifelse(become_same==1 & (minyr_diffHRR_part>minyr_sameHRR_part | minyr_diffHRR_part==0), "Become Connected Same", NA)) %>%
+  mutate(group = ifelse(never_same==1 & never_diff==1, "Never Connected", group)) %>%
+  mutate(group = ifelse(become_diff==1 & is.na(group), "Become Connected Different", group))
 
 # create relative year variable
-hospital_data <- hospital_data %>%
+outcome_table <- hospital_data %>%
+  filter(!is.na(group)) %>%
   mutate(TaxYr = as.numeric(TaxYr),
          minyr_sameHRR_part = as.numeric(minyr_sameHRR_part),
          minyr_diffHRR_part = as.numeric(minyr_diffHRR_part)) %>%
   mutate(rel_year = ifelse(group=="Become Connected Same", minyr_sameHRR_part-TaxYr, NA)) %>%
   mutate(rel_year = ifelse(group=="Become Connected Different", minyr_diffHRR_part-TaxYr, rel_year))
 
-treat_stats <- hospital_data %>%
-  filter(!is.na(rel_year) & minyr_sameHRR_part!=2023 & minyr_diffHRR_part!=2023) %>%
+p_values_relative <- outcome_table %>%
+  filter(minyr_sameHRR_part != 2023 & minyr_diffHRR_part != 2023) %>%
+  filter(!is.na(rel_year)) %>%
+  filter(rel_year < 4 & rel_year > -4) %>%
+  pivot_longer(
+    cols = c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc",
+             "build_purch", "fixedequipment_purch", "movableequipment_purch",
+             "tot_pat_rev", "tot_operating_exp"),
+    names_to = "variable",
+    values_to = "value"
+  ) %>%
+  # ensure variable names match the *_m keys in outcome_table_relative
+  mutate(variable = paste0(variable, "_m")) %>%
+  mutate(timing = ifelse(rel_year < -1, "Pre", "Post")) %>%
+  group_by(group, variable) %>%
+  summarise(
+    p_value = {
+      pre  <- value[timing == "Pre"]
+      post <- value[timing == "Post"]
+      if (length(pre) > 1 && length(post) > 1) {
+        suppressWarnings(t.test(pre, post, var.equal = FALSE)$p.value)
+      } else {
+        NA_real_
+      }
+    },
+    .groups = "drop"
+  )
+
+outcome_table_relative <- outcome_table %>%
+  filter(minyr_sameHRR_part!=2023 & minyr_diffHRR_part!=2023) %>%
+  filter(!is.na(rel_year)) %>%
   group_by(rel_year, group) %>%
   summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
                  "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
-  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean")
+  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
+  filter(rel_year<4 & rel_year>-4) %>%
+  mutate(timing = ifelse(rel_year < -1, "Pre", "Post")) %>%
+  group_by(group, variable, timing) %>%
+  summarise(mean=mean(mean)) %>%
+  pivot_wider(id_cols = c(group, variable), names_from = timing, values_from = mean) %>%
+  mutate(difference = Post-Pre) %>%
+  left_join(p_values_relative, by = c("group", "variable"))
+outcome_table_other <- outcome_table %>%
+  filter(is.na(rel_year)) %>%
+  group_by(TaxYr, group) %>%
+  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
+                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
+  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
+  group_by(group, variable) %>%
+  summarise(Pre=mean(mean))
 
-treat_stats %>%
+outcome_table <- bind_rows(outcome_table_relative, outcome_table_other) %>%
+  select(variable, group, Pre, Post, difference, p_value) %>%
+  mutate(Pre = ifelse(abs(Pre)>10000, Pre/100000, Pre),
+         Post = ifelse(abs(Post)>10000, Post/100000, Post),
+         difference = ifelse(abs(difference)>10000, difference/100000, difference)) %>%
+  mutate(group = factor(group, levels = c("Become Connected Same", "Become Connected Different", "Never Connected"))) %>%
+  arrange(group) %>%
+  arrange(variable)
+
+outcome_table %>% ungroup() %>%
+  select(-variable) %>%
+  knitr::kable(format = "latex",
+               col.names = c("Sample of Hospitals", "Pre- Mean", "Post- Mean", "Post - Pre", "P-Value"),
+               caption = "Outcome Variables Over Time\\label{tab:outcome_tab}",
+               row.names = FALSE,
+               table.envir="table",
+               digits=2,
+               booktabs=TRUE,
+               escape=F,
+               align=c("l","c","c","c","c","c","c","c","c"),
+               position="hp!",
+               linesep = "") %>%
+  pack_rows(group_label = "Bed Concentration", start_row = 1, end_row = 3) %>%
+  pack_rows(group_label = "Building Purchases (/100k)", start_row = 4, end_row = 6) %>%
+  pack_rows(group_label = "Fixed Equipment Purchases (/100k)", start_row = 7, end_row = 9) %>%
+  pack_rows(group_label = "Movable Equipment Purchases (/100k)", start_row = 10, end_row = 12) %>%
+  pack_rows(group_label = "Percent Patients Medicaid", start_row = 13, end_row = 15) %>%
+  pack_rows(group_label = "Percent Patients Medicare", start_row = 16, end_row = 18) %>%
+  pack_rows(group_label = "Total Discharges", start_row = 19, end_row = 21) %>%
+  pack_rows(group_label = "Total Operating Expenses (/100k)", start_row = 22, end_row = 24) %>%
+  pack_rows(group_label = "Patient Revenue (/100k)", start_row = 25, end_row = 27) %>%
+  write(file = paste0(objects_path, "hosp_outcomes_table.tex"))
+
+# now make graphs of each for the outcomes 
+outcome_graphs <- hospital_data %>%
+  filter(!is.na(group)) %>%
+  mutate(TaxYr = as.numeric(TaxYr),
+         minyr_sameHRR_part = as.numeric(minyr_sameHRR_part),
+         minyr_diffHRR_part = as.numeric(minyr_diffHRR_part)) %>%
+  mutate(rel_year = ifelse(group=="Become Connected Same", minyr_sameHRR_part-TaxYr, NA)) %>%
+  mutate(rel_year = ifelse(group=="Become Connected Different", minyr_diffHRR_part-TaxYr, rel_year))
+
+outcome_graphs_relative <- outcome_graphs %>%
+  filter(minyr_sameHRR_part!=2023 & minyr_diffHRR_part!=2023) %>%
+  filter(!is.na(rel_year)) %>%
+  group_by(rel_year, group) %>%
+  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
+                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
+  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
+  filter(rel_year<4 & rel_year>-4) 
+outcome_table_other <- outcome_table %>%
+  filter(is.na(rel_year)) %>%
+  group_by(TaxYr, group) %>%
+  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
+                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
+  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
+  group_by(group, variable) %>%
+  summarise(Pre=mean(mean))
+
+
+
+
+# graph for operating expenses
+tot_operating_exp <- graphs %>%
+  filter(variable=="tot_operating_exp_m") %>%
+  mutate(mean = mean/100000) %>%
+  mutate(
+    axis_type = case_when(
+      group %in% c("Become Connected Same", "Become Connected Different") ~ "Relative Year",
+      group == "Never Connected" ~ "Year",
+      TRUE ~ "Unknown axis"
+    ),
+    x_display = if_else(axis_type == "Relative Year", rel_year, TaxYr)
+  ) %>%
+  filter(!is.na(x_display)) %>%
+  ggplot(aes(x = x_display, y = mean, color = group)) +
+  geom_line() +
+  geom_point(size = 2) +
+  facet_wrap(~ axis_type, scales = "free_x", nrow = 1) +
+  scale_color_brewer(palette = "Dark2") +
+  labs(
+    x = NULL,                       # Strip labels will communicate the axis
+    y = "Total Operating Expenses (/100,000)\n",
+    color = "Group",
+  ) +
+  theme_minimal(base_size = 12) +
+  theme(
+    legend.position = "bottom",
+    strip.text = element_text(face = "bold")
+  ) + ylim(0,3000) + theme(element_text(family = "serif", size=13)) +
+  geom_segment(
+    data = data.frame(axis_type = "Relative Year", x = 0, xend = 0, y = 0, yend = 3000),
+    aes(x = x, xend = xend, y = y, yend = yend),
+    linetype = "dashed", color = "gray", inherit.aes = FALSE
+  )
+
+
+# I'm going to try to put it into a table instead of graphs, the graphs get to be too much
+
+
+
+
+
+
+    
+         
+
+graphs %>%
   filter(variable %in% c("tot_operating_exp_m")) %>%
   ggplot(aes(x=rel_year, y=mean, color=group, linetype=variable)) + geom_line() +
-  theme_minimal() + xlim(-3,3) 
+  theme_minimal() + xlim(-3,3) + scale_x_continuous(name = "Relative Year", sec.axis = sec_axis(TaxYr, name = "Year"))
 treat_stats %>%
   filter(variable %in% c("perc_mcaid_m", "perc_mcare_m", "bed_conc_m")) %>%
   ggplot(aes(x=rel_year, y=mean, color=group, linetype=variable)) + geom_line() +
