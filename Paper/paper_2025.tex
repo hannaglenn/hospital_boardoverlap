@@ -196,18 +196,22 @@ sorting=nyt,citestyle=authoryear]{biblatex}
 
     \import{Objects}{hosp_outcomes_table.tex}
 
+    \section{Estimation and Identification}
 
-    \section{Is Leadership Overlap Correlated with Consolidation?}
+    I estimate the effect of gaining or losing leadership overlap on several hospital outcomes. Since hospitals become connected via leadership at different times and their effects could be heterogeneous, I employ a stacked difference-in-differences (DiD) approach. Specifically, I construct event-time observations for each treated hospital around the time of gaining or losing overlap and stacks these into a single panel. This method accommodates variation in treatment timing across hospitals and enables estimation of dynamic effects. On the stacked panel, I estimate the following equation:
 
-    While hospitals often publicly declare that their leadership affiliations are not intended to lead to mergers or other  consolidation (add citations), the relationship between leadership overlap and consolidation is an open empirical question.    Theoretically, there are three ways that leadership overlap and consolidation could be related. First, leadership overlap may act as a substitute for formal mergers. In this case, hospitals leverage shared governance to achieve some benefits of consolidation, such as strategic alignment, resource coordination, and cost efficiencies, without incurring the regulatory scrutiny and transaction costs associated with a merger. If this hypothesis holds, we would expect leadership overlap to reduce the likelihood of subsequent merger activity. Second, leadership overlap may serve as a precursor to merging. Hospitals might begin by sharing board members or executives to build trust, harmonize decision-making, and prepare for operational integration. Under this interpretation, overlap is an intermediate step toward full consolidation, and its presence should increase the probability of a future merger. Third, leadership overlap may result from intentions to merge. Here, overlap is not an independent strategic choice but rather a signal of an already-decided merger plan. This scenario introduces endogeneity concerns, as leadership overlap and merger intentions are jointly determined. In addition to its possible role in mergers, leadership overlap may also influence the likelihood of hospital closure. Shared leadership could provide access to broader networks, financial resources, and managerial expertise, which might help struggling hospitals remain viable and avoid closure. Conversely, overlap could signal strategic realignment within a system, where weaker hospitals are deliberately phased out to concentrate resources in stronger facilities. In this sense, leadership overlap could either reduce closure risk by stabilizing operations or increase it if consolidation strategies involve selective shutdowns.
-
-    To evaluate these possibilities, I estimate the effect of gaining or losing leadership overlap on two outcomes: (1) the likelihood that a hospital closes in the future, and (2) the likelihood that it merges in the future. I employ a stacked difference-in-differences (DiD) approach, which constructs event-time observations for each treated hospital around the time of gaining or losing overlap and stacks these into a single panel. This method accommodates variation in treatment timing across hospitals and enables estimation of dynamic effects. 
-
-    \begin{equation}
+    \begin{equation}\label{eq:stacked}
     Y_{it} = \alpha + \sum_{k \neq -1} \beta_k \cdot D_{i,t+k} + \gamma_i + \delta_t + \varepsilon_{it}
     \end{equation}
 
     \noindent where $Y_{it}$ is the outcome for hospital $i$ at time $t$ (closure or merger indicator), $D_{i,t+k}$ is an indicator for event time $k$ relative to the change in leadership overlap (with $k = -1$ as the omitted category), $\gamma_i$ and $\delta_t$ are hospital and time fixed effects, respectively, and $\beta_k$ captures the effect at each event time $k$.
+
+
+    \section{Leadership Overlap and Consolidation}
+
+    While hospitals often publicly declare that their leadership affiliations are not intended to lead to mergers or other consolidation (add citations), the underlying nature of overlapping leadership with regards to other types of hospital affiliations is an open empirical question. Theoretically, there are three ways that leadership overlap and consolidation could be related. First, leadership overlap may act as a substitute for formal mergers. In this case, hospitals leverage shared governance to achieve some benefits of consolidation, such as strategic alignment, resource coordination, and cost efficiencies, without incurring the regulatory scrutiny and transaction costs associated with a merger. If this hypothesis holds, we would expect leadership overlap to reduce the likelihood of subsequent merger activity. Second, leadership overlap may serve as a precursor to merging. Hospitals might begin by sharing board members or executives to build trust, harmonize decision-making, and prepare for operational integration. Under this interpretation, overlap is an intermediate step toward full consolidation, and its presence should increase the probability of a future merger. Third, leadership overlap may result from intentions to merge. Here, overlap is not an independent strategic choice but rather a signal of an already-decided merger plan. This scenario introduces endogeneity concerns, as leadership overlap and merger intentions are jointly determined. In addition to its possible role in mergers, leadership overlap may also influence the likelihood of hospital closure. Shared leadership could provide access to broader networks, financial resources, and managerial expertise, which might help struggling hospitals remain viable and avoid closure. Conversely, overlap could signal strategic realignment within a system, where weaker hospitals are deliberately phased out to concentrate resources in stronger facilities. In this sense, leadership overlap could either reduce closure risk by stabilizing operations or increase it if consolidation strategies involve selective shutdowns.
+
+    The estimates from Equation \ref{eq:stacked} where hospital closure is the outcome variable are shown in Figure \ref{fig:closure}. I consider three types of variation in leadership overlap: gaining overlap with a hospital in the same HRR or different HRR, and losing overlap with a hospital in the same HRR or different HRR. While gaining leadership overlap with another hospital in the same or different HRR is not correlated with closing in the future, hospitals that lose overlap are .15 percentage points more likely to close 1-4 years after losing connectedness compared to (who are the comparison hospitals here??). Part of this may is mechanical, as hospitals that close (drop out of the data) necessarily lose board overlap. (I don't think theres any way to get rid of this mechanical relationship...) 
 
     \begin{figure}[ht!]
         \centering
@@ -217,13 +221,7 @@ sorting=nyt,citestyle=authoryear]{biblatex}
         \label{fig:closure}
     \end{figure}
 
-    \begin{figure}[ht!]
-        \centering
-        \vspace{9mm}
-        \caption{Effect of Overlap on in-System Overlap}
-        \includegraphics[width=.9\textwidth]{Objects/any_formal_sameHRR.pdf}
-        \label{fig:any_formal_sameHRR}
-    \end{figure}
+    I also estimate Equation \ref{eq:stacked} where the outcome variable is an indicator for whether or not the hospital is independent, where independent means the hospital does not belong to a system. I present the results of this estimation in Figure \ref{fig:independent}. In this case, losing leadership overlap is not associated with any changes in system status. However, gaining leadership overlap in the same HRR is slightly negatively associated with being independent in the first year after becoming connected via leadership. 
 
     \begin{figure}[ht!]
         \centering
@@ -233,9 +231,71 @@ sorting=nyt,citestyle=authoryear]{biblatex}
         \label{fig:independent}
     \end{figure}
 
+    This does not necessarily mean that leadership overlap causes closure or mergers, as the relationship could be more complex than that. Add more to this paragraph about how this is not causal but indicates that the nature of board overlap is more than just expertise sharing?? 
 
+
+    \section{Leadership Overlap and Hospital Outcomes}
+
+    If leadership overlap, encompassing informal hospital affiliations, is a substitute for more formal mergers, there are several outcomes that we typically see affected in the hospital merger literature that we can test whether they are also associated with leadership overlap. These outcomes fall into categories of patient population, service offerings, and operating expenses. 
+
+    \subsection{Patient Population}
+
+    
+
+    \begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.47\textwidth}
+        \caption{Medicaid Discharges}
+        \includegraphics[width=\textwidth]{Objects/mcaid_discharges.pdf}
+        \label{fig:mcaid}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.47\textwidth}
+        \caption{Medicare Discharges}
+        \includegraphics[width=\textwidth]{Objects/mcare_discharges.pdf}
+        \label{fig:mcare}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.47\textwidth}
+        \caption{Total Discharges}
+        \includegraphics[width=\textwidth]{Objects/tot_discharges.pdf}
+    \end{subfigure}
+    \label{fig:mcaid_mcare}
+    \end{figure}
+
+
+    \subsection{Service Offerings}
      
+    \begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.47\textwidth}
+        \caption{Bed Concentration}
+        \includegraphics[width=\textwidth]{Objects/bed_conc.pdf}
+        \label{fig:bed_conc}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.47\textwidth}
+        \caption{Number of Services}
+        \includegraphics[width=\textwidth]{Objects/num_services.pdf}
+        \label{fig:num_services}
+    \end{subfigure}
+    \label{fig:services}
+    \end{figure}
 
+
+    \subsection{Investment and Operating Expenses}
+
+    \begin{figure}[h!]
+    \centering
+    \begin{subfigure}[b]{0.47\textwidth}
+        \caption{Purchases (Building or Equipment)}
+        \includegraphics[width=\textwidth]{Objects/any_purch.pdf}
+        \label{fig:any_purch}
+    \end{subfigure}
+    \begin{subfigure}[b]{0.47\textwidth}
+        \caption{Total Operating Expenses}
+        \includegraphics[width=\textwidth]{Objects/tot_operating_exp.pdf}
+        \label{fig:tot_oper_exp}
+    \end{subfigure}
+    \label{fig:expenses}
+    \end{figure}
 
     
     \section{Conclusion}
