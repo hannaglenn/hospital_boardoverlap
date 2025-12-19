@@ -10,6 +10,10 @@ source("./Scripts/paths.R")
 all_people_data <- readRDS(paste0(created_data_path, "/all_people_data_scheduleH.rds"))
 cw <- readRDS(paste0(created_data_path, "/updated_ein_aha_cw.rds"))
 
+new_people_data <- readRDS(paste0(created_data_path, "new_xmls_people_data.rds")) %>%
+  rename(PersonNm = person_name, TitleTxt = title, TaxYr = end_year, Filer.EIN=ein) %>%
+  filter(PersonNm != "NONE" & !is.na(PersonNm))
+
 # only keep observations where EIN is found in the crosswalk
 all_people_data <- all_people_data %>%
   filter(Filer.EIN %in% cw$Filer.EIN)
@@ -35,30 +39,35 @@ observe <- all_people_data %>%
 all_people_data <- all_people_data %>%
   filter(!is.na(TitleTxt))
 
-# tabulate the number of unique EINs for every value of TaxYr
-all_people_data %>%
-  group_by(TaxYr) %>%
-  summarise(n = n_distinct(Filer.EIN))
-
-# Remove 2015 and 2023
-all_people_data <- all_people_data %>%
-  filter(TaxYr!=2015 & TaxYr!=2023)
-
 # create data set with only relevant variables
 people_data <- all_people_data %>%
   select(TaxYr, Filer.EIN, PersonNm, TitleTxt)
 
+# join to updated people_data from XMLs that I webscraped
+people_data <- people_data %>%
+  rbind(new_people_data)
+
 # convert to all lowercase
 people_data <- people_data %>%
   mutate(PersonNm = tolower(PersonNm),
-         TitleTxt = tolower(TitleTxt))
+         TitleTxt = tolower(TitleTxt)) %>%
+  distinct()
+
+# tabulate the number of unique EINs for every value of TaxYr
+people_data %>%
+  group_by(TaxYr) %>%
+  summarise(n = n_distinct(Filer.EIN))
+
+# Remove 2024
+people_data <- people_data %>%
+  filter(TaxYr!=2024)
 
 # GOAL 1: GET ANY RELEVANT TITLES FROM THE NAME COLUMN #################
 # I got these lists by going through all of the names with at least 3 words. Don't do this again unless you add more names!!
 doctor_list <- c("md", "do", "urologist", "mdmba")
 other_doctor_list <- c("mbbch", "mbbs", "dds", "dentist", "od", "pharmd", "pt", "radiologist", "physician", "surgeon", "otolaryngologist")
 nurse_list <- c("rn", "dnp", "aprn", "crna", "np", "scn", "fnp", "cne", "fnp-c", "apnp", "fnp-", "cenp", "mphrn", "acnp", "msnrnfaan", "crnp", "msnrn",
-                "eddrn", "dpn", "drnp", "anp", "edrn", "arnp", "pnp", "cnp")
+                "eddrn", "dpn", "drnp", "anp", "edrn", "arnp", "pnp", "cnp", "bcccrn")
 ha_list <- c("mha", "fache", "mhadrph", "mhsa", "mhcm", "mhs")
 remove_list <- c("mbbch", "mbbs", "until", "as of", "eff", "end", "beg", "thru", "through", "osb",
                  "ending", "term", "mph", "deceased", "to", "begin", "left", "see statement", "director", "chair", "hired", "termed",
@@ -100,7 +109,8 @@ remove_list <- c("mbbch", "mbbs", "until", "as of", "eff", "end", "beg", "thru",
                  "ppcme", "august", "partial", "lmh", "evp ballad health", "past", "tmh", "- aug", "evp", "lmhtrh", "chairperson", "treas", "nov", "dec",
                  "rtrtc", "dmo", "truste", "presiden", "fach", "fhf", "year", "prn", "execut", "february", "frm", "- mar", "ncr", "fdtn", "ipd", 
                  "aug", "nov", "feb", "only", "part yr", "care div", "-cur", "- mar", " - care", "- reg", "-c", "- fin", "-directorjul", "-july",
-                 "acns", "mpah", "achce", "judge", "rabbi", "rc")
+                 "acns", "mpah", "achce", "judge", "rabbi", "rc", "jrphd", "since", "sept", "ex-officio", "jun", "sep", "aca", "nd", "sec", "co", "stm", "jr", "dd", "ch",
+                 "vg", "faacvpr", "svcs", "ahhm", "care", "see sch", "sch", "inc", "vcos", "jrpa", "ahuv", "yr", "rahn", "syed", "cos", "ehfph", "ehmc", "msph")
 
 # Create name_cleaned variable
 people_data <- people_data %>%
@@ -145,6 +155,10 @@ people_data <- people_data %>%
   mutate(name_cleaned = str_squish(name_cleaned)) %>%
   mutate(name_cleaned = str_remove(name_cleaned, "-$")) 
 
+# Remove parentheses
+people_data <- people_data %>%
+  mutate(name_cleaned = str_remove(name_cleaned, "()"))
+
 # Remove "esq" occuring at the end
 people_data <- people_data %>%
   mutate(name_cleaned = str_remove(name_cleaned, "esq$"))
@@ -154,12 +168,14 @@ people_data <- people_data %>%
   filter(PersonNm!="non compensated trustees")
 
 # # look at observations with a lot of words
-# observe <- people_data %>%
-#   mutate(name_cleaned = str_remove_all(name_cleaned, "\\b[a-z]\\b")) %>%
-#   mutate(name_cleaned = str_squish(name_cleaned)) %>%
-#   filter(str_count(name_cleaned, "\\s")>1) %>%
-#   distinct(name_cleaned)
+observe <- people_data %>%
+   mutate(name_cleaned = str_remove_all(name_cleaned, "\\b[a-z]\\b")) %>%
+   mutate(name_cleaned = str_squish(name_cleaned)) %>%
+   filter(str_count(name_cleaned, "\\s")>1) %>%
+   distinct(name_cleaned)
 # write.csv(observe, paste0(created_data_path, "observe.csv"))
+
+
 
 # GOAL 2: ASSIGN POSITIONS ####
 # change titles to lower case
@@ -186,8 +202,21 @@ cno_list <- c("cno", "chief nurs")
 other_chief_list <- c("c[a-su-z]o", "administrator", "chief", "exec", "cheif", "officer", "ofcr")
 pres_list <- c("pres")
 vp_list <- c("vp", "svp", "vice pres")
-board_list <- c("director$", "board", "member", "trustee", "chai", "secretary", "sec", "treasurer", "treas", "trustte", "brd")
+board_list <- c("director$", "board", "member", "trustee", "chai", "secretary", "sec", "treasurer", "treas", "trustte", "brd", "diretor", "dir$")
 
+# Remove anything after "as of"
+people_data <- people_data %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "as of.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "thru.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "through.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "start.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "end.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "eff.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "beginning.+$"))
+
+# Remove all digits
+people_data <- people_data %>%
+  mutate(TitleTxt = str_remove_all(TitleTxt, "[0-9]+"))
 
 
 people_data <- people_data %>% 
@@ -214,6 +243,10 @@ people_data <- people_data %>%
   mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(pres_list, collapse="|")), "president", position)) %>%
   mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(board_list, collapse="|")), "board", position))
 
+observe <- people_data %>%
+  filter(is.na(position)) %>%
+  filter(!(TitleTxt=="physician"))
+
 # Remove anyone that doesn't have a position (these are nurses and physicians left)
 people_data <- people_data %>%
   filter(!is.na(position))
@@ -231,7 +264,7 @@ people_data <- people_data %>%
 people_data <- people_data %>%
   select(-PersonNm, -TitleTxt) %>%
   distinct()
-# 216k observations
+# 376k observations
 
 # GOAL 3: GET MALE/FEMALE OF EACH NAME #########
 firstnames <- read_csv(paste0(raw_data_path, "/yob2000.txt"), col_names = FALSE) %>% 
@@ -309,11 +342,10 @@ genders <- people_data %>%
 # join back to original data
 people_data <- people_data %>%
   left_join(genders, by=c("first_name"="name"))
-  # only 2% of observations are missing gender
 
 # save data
-saveRDS(people_data, paste0(created_data_path, "cleaned_people_data.rds"))
-write.csv(people_data, paste0(created_data_path, "cleaned_people_data.csv"))
+saveRDS(people_data, paste0(created_data_path, "cleaned_people_data_new.rds"))
+write.csv(people_data, paste0(created_data_path, "cleaned_people_data_new.csv"))
 
 
 

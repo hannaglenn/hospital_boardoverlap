@@ -20,32 +20,68 @@ options(knitr.kable.NA = '')
 people_data <- readRDS(paste0(created_data_path, "people_connections_boardandexec.rds"))
 hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec.rds"))
 hospital_connections <- readRDS(paste0(created_data_path, "hospital_connections_boardandexec.rds"))
-AHA <- read_csv(paste0(raw_data_path, "\\AHAdata_20052023.csv")) 
+AHA <- read_csv(paste0(raw_data_path, "AHAdata_20052023.csv")) 
 
-# filter out hospitals that turn their overlap on and off
+# generic filtering
+hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec.rds"))
+
+# Filter to either being present in 2014-2021 at least or dropping out of the data
+# this gets rid of hospitals who come in and out of the data due to missing tax records
+hospital_data <- hospital_data %>%
+  filter(any_sameHRR_nonmiss_2014_2021 | dropout_both_ind) %>%
+  group_by(Filer.EIN) %>%
+  fill(minyr_sameHRR_part, minyr_diffHRR_part, maxyr_sameHRR_part, maxyr_diffHRR_part, .direction="downup") %>%
+  ungroup()
+
+# add indicator for the time the hospital closes
+hospital_data <- hospital_data %>%
+  mutate(closure = ifelse(TaxYr>=dropout_year,1,0)) %>%
+  mutate(closure = ifelse(is.na(closure),0,closure))
+
+# convert variables to numeric
+hospital_data <- hospital_data %>%
+  mutate(minyr_sameHRR_part = as.numeric(minyr_sameHRR_part),
+         minyr_diffHRR_part = as.numeric(minyr_diffHRR_part),
+         maxyr_sameHRR_part = as.numeric(maxyr_sameHRR_part),
+         maxyr_diffHRR_part = as.numeric(maxyr_diffHRR_part),
+         minyr_sameHRR_formal = as.numeric(minyr_sameHRR_formal),
+         maxyr_sameHRR_formal = as.numeric(maxyr_sameHRR_formal),
+         Filer.EIN = as.numeric(Filer.EIN),
+         TaxYr = as.numeric(TaxYr))
+
+# create variables for always, become, and never connected in the same and different HRRs
 hospital_data <- hospital_data %>%
   group_by(Filer.EIN) %>%
-  arrange(TaxYr) %>%
-  mutate(lag_treat = dplyr::lag(any_partnership_sameHRR)) %>%
-  mutate(lead_treat = dplyr::lead(any_partnership_sameHRR)) %>%
-  mutate(any_partnership_sameHRR = ifelse(!is.na(lag_treat) & !is.na(lead_treat) & lag_treat==1 & lead_treat==1,1,any_partnership_sameHRR)) %>%
-  mutate(drop = ifelse(lag_treat==1 & any_partnership_sameHRR==0,1,NA)) %>%
-  fill(drop, .direction="downup") %>%
+  mutate(always_same = ifelse(minyr_sameHRR_part==min(TaxYr[!is.na(any_partnership_sameHRR)]) & maxyr_sameHRR_part==max(TaxYr[!is.na(any_partnership_sameHRR)]),1,0),
+         become_same = ifelse(minyr_sameHRR_part>min(TaxYr[!is.na(any_partnership_sameHRR)]),1,0),
+         never_same = ifelse(minyr_sameHRR_part==0,1,0),
+         lose_same = ifelse(always_same==0 & never_same==0 & become_same==0,1,0)) %>%
+  mutate(always_diff = ifelse(minyr_diffHRR_part==min(TaxYr[!is.na(any_partnership_sameHRR)]) & maxyr_diffHRR_part==max(TaxYr[!is.na(any_partnership_sameHRR)]),1,0),
+         become_diff = ifelse(minyr_diffHRR_part>min(TaxYr[!is.na(any_partnership_sameHRR)]),1,0),
+         never_diff = ifelse(minyr_diffHRR_part==0,1,0),
+         lose_diff = ifelse(always_diff==0 & never_diff==0 & become_diff==0,1,0)) %>%
+  mutate(always_formal_same = ifelse(minyr_sameHRR_formal==min(TaxYr[!is.na(any_partnership_sameHRR)]) & maxyr_sameHRR_formal==max(TaxYr[!is.na(any_partnership_sameHRR)]),1,0),
+         become_formal_same = ifelse(minyr_sameHRR_formal>min(TaxYr[!is.na(any_partnership_sameHRR)]),1,0),
+         never_formal_same = ifelse(minyr_sameHRR_formal==0,1,0)) %>%
+  ungroup()
+
+
+
+# create different data sets based on the control and treatment groups I want to use -------------------------------
+hospital_data_closures <- hospital_data %>%
+  mutate(maxyr_sameHRR_part = ifelse(dropout_both_ind & maxyr_sameHRR_part==dropout_year-1,NA,maxyr_sameHRR_part),
+         maxyr_diffHRR_part = ifelse(dropout_both_ind & maxyr_diffHRR_part==dropout_year-1,NA,maxyr_diffHRR_part))
+
+hospital_data_behaviors <- hospital_data %>%
+  filter(any_sameHRR_nonmiss_2014_2021) %>%
+  filter(minyr_sameHRR_part>0 | maxyr_sameHRR_part>0 | always_diff==1 | abs(minyr_diffHRR_part - minyr_sameHRR_part)>2) %>%   # filter control group to connected in different HRR
+  filter(always_formal_same==1 | never_formal_same==1 | abs(minyr_sameHRR_formal - minyr_sameHRR_part)>2) %>% # filter out changes to in-system connectedness
+  group_by(Filer.EIN) %>%
+  filter(sum(independent, na.rm=T)==n() | sum(independent, na.rm=T)==0) %>% # filter out those who switch being affiliated with a system
+  filter(minyr_sameHRR_part!=min(TaxYr)) %>% # filter out those treated in the first period
   ungroup() %>%
-  filter(is.na(drop)) 
+  filter(minyr_sameHRR_part==0 | maxyr_sameHRR_part - minyr_sameHRR_part>2)  # make sure they stay connected at least 2 years
 
-# drop 2016 because the sample of hospitals is smaller
-hospital_data <- hospital_data %>%
-  filter(TaxYr!=2016)
-
-# create variables for always, become, and never connected in the same and different HRRs (for partnerships)
-hospital_data <- hospital_data %>%
-  mutate(always_same = ifelse(minyr_sameHRR_part==2017,1,0),
-         become_same = ifelse(minyr_sameHRR_part>2017,1,0),
-         never_same = ifelse(minyr_sameHRR_part==0,1,0)) %>%
-  mutate(always_diff = ifelse(minyr_diffHRR_part==2017,1,0),
-         become_diff = ifelse(minyr_diffHRR_part>2017,1,0),
-         never_diff = ifelse(minyr_diffHRR_part==0,1,0))
 
 # save a list of EINs that stay in the analysis data set to verify the connections
 final_ein_list <- hospital_data %>%
@@ -57,8 +93,7 @@ saveRDS(final_ein_list, file=paste0(created_data_path, "final_ein_list_boardande
 people_data <- people_data %>%
   ungroup() %>%
   filter(Filer.EIN %in% unique(hospital_data$Filer.EIN)) %>%
-  mutate(female = ifelse(gender=="female",1,0)) %>%
-  filter(TaxYr!=2016) 
+  mutate(female = ifelse(gender=="female",1,0)) 
 
 # functions -----------------------------------------------------------------------
 count_obs <- function(data, filter_col) {
@@ -67,8 +102,6 @@ count_obs <- function(data, filter_col) {
     distinct(name_cleaned) %>%
     nrow()
 }
-
-
 
 # table: summary stats of individual characteristics for board members and hospital board teams --------------------------------------------------------
 n_board_people <- people_data %>%
@@ -117,7 +150,7 @@ board_hosp_stats <- people_data %>%
   summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
   ungroup() %>%
   summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
-  mutate(sample = "Individual Hospital Boards",
+  mutate(sample = "Hospital Boards",
          n = n_hosp_board) %>%
   select(sample, n, doctor, nurse, ha, female)
 exec_hosp_stats <- people_data %>%
@@ -126,7 +159,7 @@ exec_hosp_stats <- people_data %>%
   summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
   ungroup() %>%
   summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
-  mutate(sample = "Individual Hospital Boards",
+  mutate(sample = "Hospital Executive Teams",
          n = n_hosp_exec) %>%
   select(sample, n, doctor, nurse, ha, female)
 
@@ -152,29 +185,38 @@ knitr::kable(stats,
 # graph: percent of hospitals/HRRs that are connected in each year--------------------------------------------
 hosp <- hospital_data %>%
   group_by(TaxYr) %>%
-  summarise(m = mean(any_partnership_sameHRR)) %>%
-  mutate(group="Hospitals (by Board/Exec)")
+  summarise(m = mean(any_partnership_sameHRR, na.rm=T)) %>%
+  mutate(group="Hospitals")
 hrr <- hospital_data %>%
   group_by(TaxYr, HRRCODE) %>%
-  summarise(connected = sum(any_partnership_sameHRR)) %>%
+  summarise(connected = sum(any_partnership_sameHRR, na.rm=T)) %>%
   mutate(connected = ifelse(connected>0, 1, 0)) %>%
   group_by(TaxYr) %>%
   summarise(m= mean(connected)) %>%
   mutate(group = "HRRs")
-both <- rbind(hosp, hrr)
+sys <- hospital_data %>%
+  group_by(TaxYr) %>%
+  mutate(in_sys = ifelse(independent==1,0,1)) %>%
+  summarise(m=mean(in_sys, na.rm=T)) %>%
+  mutate(group="Hospitals In-System")
+both <- rbind(hosp, hrr, sys) %>%
+  mutate(TaxYr=as.numeric(TaxYr))
 
 ggplot(both, aes(x=TaxYr, y=m, group=group, colour = group)) +
   geom_line() + geom_point() +
   labs(title = "",
        x = "\nYear",
-       y = "Percent Connected\n") +
-  theme_minimal() + xlim(2017,2022) + ylim(0,.5) +
+       y = "Fraction Connected or In-System\n") +
+  theme_minimal() + xlim(2014,2023) + ylim(0,.75) +
   labs(color ="") +
   # add labels for the raw number of hospitals at each point using num_conn_list
 #  geom_label(aes(x=TaxYr, y=m_connected, label=num_conn_list$n_connected), vjust=-1, size = 3) +
-  theme(text = element_text(size=13, family = "serif"))
+  theme(text = element_text(size=13, family = "serif")) 
+
 
 ggsave(paste0(objects_path, "//connected_percent.pdf"), width=6, height=3)
+
+
 
 
 # graph: maps with connected hospitals in blue ---------------------------------------------------------
@@ -225,7 +267,7 @@ plot_map <- function(df, year) {
 }
 
 # Generate maps for each year (2017-2022)
-plots <- lapply(2017:2022, function(year) plot_map(hospital_connections, year))
+plots <- lapply(2014:2021, function(year) plot_map(hospital_connections, year))
 
 # combine legends into one 
 combined_plot <-  wrap_plots(plots, ncol = 2) + theme(legend.position = "bottom") + theme(legend.title = element_text(size = 12), legend.text = element_text(size = 12)) +
@@ -236,12 +278,12 @@ combined_plot <-  wrap_plots(plots, ncol = 2) + theme(legend.position = "bottom"
   theme(plot.margin = margin(0,0,0,0)) + theme(element_text(family = "serif", size=13))
 
 # save combined plot
-ggsave("Objects//connected_maps.pdf", width = 6, height = 6.5, units = "in")
+ggsave("Objects//connected_maps.pdf", width = 6, height = 8, units = "in")
 
 
 # graph: HRRs with connected hospitals within them -------------------------------------------------
 # read in HRR shape file
-hrr_shapes <- sf::st_read(paste0(raw_data_path, "\\HRR_Bdry__AK_HI_unmodified\\HRR_Bdry__AK_HI_unmodified\\hrr-shapefile\\Hrr98Bdry_AK_HI_unmodified.shp"))
+hrr_shapes <- sf::st_read(paste0(raw_data_path, "/HRR_Bdry__AK_HI_unmodified/HRR_Bdry__AK_HI_unmodified/hrr-shapefile/Hrr98Bdry_AK_HI_unmodified.shp"))
 
 plot_hrr_map <- function(df, year, hrr_shapes) {
   # Filter for the year
@@ -268,7 +310,7 @@ plot_hrr_map <- function(df, year, hrr_shapes) {
     theme(element_text(family = "serif", size=13))
 }
 
-plots <- lapply(2017:2022, function(year) plot_hrr_map(hospital_connections, year, hrr_shapes))
+plots <- lapply(2014:2021, function(year) plot_hrr_map(hospital_connections, year, hrr_shapes))
 
 combined_plot <- wrap_plots(plots, ncol = 2) + theme(legend.position = "bottom") + theme(legend.title = element_text(size = 12), legend.text = element_text(size = 12)) +
   # change legend title to empty
@@ -304,7 +346,7 @@ hospital_connected_pairs_diff <- hospital_connected_pairs_diff %>%
 
 AHA_pair <- AHA %>%
   select(YEAR, ID, SERV, BDTOT, MNAME, SYSID, LAT, LONG) %>%
-  filter(YEAR>=2016 & YEAR<=2022)
+  filter(YEAR>=2014 & YEAR<=2022)
 
 # join by filer_id
 hospital_connected_pairs <- hospital_connected_pairs %>%
@@ -365,7 +407,7 @@ hospital_connected_pairs_diff <- hospital_connected_pairs_diff %>%
 
 # create variables for small vs. large hospitals
 # median bed size of all hospitals
-median_bed_size <- median(hospital_data$HOSPBD, na.rm = TRUE)
+median_bed_size <- median(hospital_data$BDTOT, na.rm = TRUE)
 
 hospital_connected_pairs <- hospital_connected_pairs %>%
   mutate(small_small = ifelse(filer_BDTOT < median_bed_size & other_BDTOT < median_bed_size, 1, 0),
@@ -451,15 +493,13 @@ knitr::kable(pair_table, format = "latex",
   pack_rows("", 10, 13, indent = FALSE, latex_gap_space = "-0.3em") %>%
   pack_rows("", 14, 15, indent = FALSE, latex_gap_space = "-0.3em") %>%
   pack_rows("", 16, 16, indent = FALSE, latex_gap_space = "-0.3em") %>%
-  pack_rows("", 17,17, indent=FALSE, latex_gap_space = "-0.3em") 
+  pack_rows("", 17,17, indent=FALSE, latex_gap_space = "-0.3em") %>%
   write("Objects//hospital_pair_types.tex")
 
 # table: characteristics of connected in same/diff HRR and not connected ------------------------------
 # add indicators
 hospital_data <- hospital_data %>%
-  mutate(general = ifelse(SERV==10,1,0),
-         sys = ifelse(is.na(SYSID),0,1),
-         academic = ifelse(MAPP5==1,1,0))
+  mutate(sys = ifelse(is.na(SYSID),0,1))
 
 n_become_same <- hospital_data %>%
   filter(become_same==1) %>%
@@ -467,6 +507,10 @@ n_become_same <- hospital_data %>%
   nrow()
 n_always_same <- hospital_data %>%
   filter(always_same==1) %>%
+  distinct(Filer.EIN) %>%
+  nrow()
+n_lose_same <- hospital_data %>%
+  filter(lose_same==1) %>%
   distinct(Filer.EIN) %>%
   nrow()
 n_become_diff <- hospital_data %>%
@@ -477,6 +521,10 @@ n_always_diff <- hospital_data %>%
   filter(always_diff==1) %>%
   distinct(Filer.EIN) %>%
   nrow()
+n_lose_diff <- hospital_data %>%
+  filter(lose_diff==1) %>%
+  distinct(Filer.EIN) %>%
+  nrow()
 n_not <- hospital_data %>%
   filter(never_same==1 & never_diff==1) %>%
   distinct(Filer.EIN) %>%
@@ -484,70 +532,93 @@ n_not <- hospital_data %>%
 
 stat_become_same <- hospital_data %>%
   filter(become_same==1) %>%
-  summarise_at(c("Num. Beds" = "HOSPBD",
+  summarise_at(c("Num. Beds" = "BDTOT",
                  "General" = "general",
                  "In System" = "sys",
-                 "Academic" = "academic",
+                 "Teaching" = "teaching",
                  "Num. Physicians" = "FTMT",
                  "Num. Nurses" = "FTRNTF"), list(mean), na.rm=T) %>%
   mutate(group = "Same HRR",
          n = n_become_same) %>%
-  select(group, n, `Num. Beds`, General, `In System`, `Academic`, `Num. Physicians`, `Num. Nurses`)
+  select(group, n, `Num. Beds`, General, `In System`, `Teaching`, `Num. Physicians`, `Num. Nurses`)
 stat_always_same <- hospital_data %>%
   filter(always_same==1) %>%
-  summarise_at(c("Num. Beds" = "HOSPBD",
+  summarise_at(c("Num. Beds" = "BDTOT",
                  "General" = "general",
                  "In System" = "sys",
-                 "Academic" = "academic",
+                 "Teaching" = "teaching",
                  "Num. Physicians" = "FTMT",
                  "Num. Nurses" = "FTRNTF"), list(mean), na.rm=T) %>%
   mutate(group = "Same HRR",
          n = n_always_same) %>%
-  select(group, n, `Num. Beds`, General, `In System`, `Academic`, `Num. Physicians`, `Num. Nurses`)
-stat_become_diff <- hospital_data %>%
-  filter(become_diff==1) %>%
-  summarise_at(c("Num. Beds" = "HOSPBD",
+  select(group, n, `Num. Beds`, General, `In System`, `Teaching`, `Num. Physicians`, `Num. Nurses`)
+stat_lose_same <- hospital_data %>%
+  filter(lose_same==1) %>%
+  summarise_at(c("Num. Beds" = "BDTOT",
                  "General" = "general",
                  "In System" = "sys",
-                 "Academic" = "academic",
+                 "Teaching" = "teaching",
+                 "Num. Physicians" = "FTMT",
+                 "Num. Nurses" = "FTRNTF"), list(mean), na.rm=T) %>%
+  mutate(group = "Same HRR",
+         n = n_lose_same) %>%
+  select(group, n, `Num. Beds`, General, `In System`, `Teaching`, `Num. Physicians`, `Num. Nurses`)
+stat_become_diff <- hospital_data %>%
+  filter(become_diff==1) %>%
+  summarise_at(c("Num. Beds" = "BDTOT",
+                 "General" = "general",
+                 "In System" = "sys",
+                 "Teaching" = "teaching",
                  "Num. Physicians" = "FTMT",
                  "Num. Nurses" = "FTRNTF"), list(mean), na.rm=T) %>%
   mutate(group = "Different HRR",
          n = n_become_diff) %>%
-  select(group, n, `Num. Beds`, General, `In System`, `Academic`, `Num. Physicians`, `Num. Nurses`)
+  select(group, n, `Num. Beds`, General, `In System`, `Teaching`, `Num. Physicians`, `Num. Nurses`)
 stat_always_diff <- hospital_data %>%
   filter(always_diff==1) %>%
-  summarise_at(c("Num. Beds" = "HOSPBD",
+  summarise_at(c("Num. Beds" = "BDTOT",
                  "General" = "general",
                  "In System" = "sys",
-                 "Academic" = "academic",
+                 "Teaching" = "teaching",
                  "Num. Physicians" = "FTMT",
                  "Num. Nurses" = "FTRNTF"), list(mean), na.rm=T) %>%
   mutate(group = "Different HRR",
          n = n_always_diff) %>%
-  select(group, n, `Num. Beds`, General, `In System`, `Academic`, `Num. Physicians`, `Num. Nurses`)
-stat_not <- hospital_data %>%
-  filter(never_same==1 & never_diff==1) %>%
-  summarise_at(c("Num. Beds" = "HOSPBD",
+  select(group, n, `Num. Beds`, General, `In System`, `Teaching`, `Num. Physicians`, `Num. Nurses`)
+stat_lose_diff <- hospital_data %>%
+  filter(lose_diff==1) %>%
+  summarise_at(c("Num. Beds" = "BDTOT",
                  "General" = "general",
                  "In System" = "sys",
-                 "Academic" = "academic",
+                 "Teaching" = "teaching",
+                 "Num. Physicians" = "FTMT",
+                 "Num. Nurses" = "FTRNTF"), list(mean), na.rm=T) %>%
+  mutate(group = "Different HRR",
+         n = n_lose_diff) %>%
+  select(group, n, `Num. Beds`, General, `In System`, `Teaching`, `Num. Physicians`, `Num. Nurses`)
+stat_not <- hospital_data %>%
+  filter(never_same==1 & never_diff==1) %>%
+  summarise_at(c("Num. Beds" = "BDTOT",
+                 "General" = "general",
+                 "In System" = "sys",
+                 "Teaching" = "teaching",
                  "Num. Physicians" = "FTMT",
                  "Num. Nurses" = "FTRNTF"), list(mean), na.rm=T) %>%
   mutate(group = "Never Connected",
          n = n_not) %>%
-  select(group, n, `Num. Beds`, General, `In System`, `Academic`, `Num. Physicians`, `Num. Nurses`)
+  select(group, n, `Num. Beds`, General, `In System`, `Teaching`, `Num. Physicians`, `Num. Nurses`)
   
-stat <- rbind(stat_become_same, stat_become_diff,stat_always_same, stat_always_diff, stat_not) %>%
+stat <- rbind(stat_become_same, stat_become_diff,stat_lose_same, stat_lose_diff, stat_always_same, stat_always_diff, stat_not) %>%
   mutate(n=as.character(n),
          `Num. Beds` = as.character(format(round(`Num. Beds`), big.mark = ",", scientific = FALSE, trim = TRUE)),
          `Num. Physicians` = as.character(format(round(`Num. Physicians`), big.mark = ",", scientific = FALSE, trim = TRUE)),
-         `Num. Nurses` = as.character(format(round(`Num. Nurses`), big.mark = ",", scientific = FALSE, trim = TRUE)))
+         `Num. Nurses` = as.character(format(round(`Num. Nurses`), big.mark = ",", scientific = FALSE, trim = TRUE))) %>%
+  select(-`Num. Physicians`)
 
 knitr::kable(stat,
              format = "latex",
-             col.names = c("Sample of Hosp.", "N", "Num. Beds", "General", "In System", "Academic", "Num. Phys.", "Num. Nurses"),
-             caption = "Hospital Characteristics by Connections\\label{tab:hosp_group_stats}",
+             col.names = c("Sample of Hosp.", "N", "Num. Beds", "General", "In System", "Academic", "Num. Nurses"),
+             caption = "Hospital Characteristics by Overlap Status\\label{tab:hosp_group_stats}",
              row.names = FALSE,
              table.envir="table",
              digits=2,
@@ -557,16 +628,22 @@ knitr::kable(stat,
              position="ht!",
              linesep = "") %>%
   pack_rows(group_label = "Become Connected", start_row = 1, end_row = 2) %>%
-  pack_rows(group_label = "Always Connected", start_row = 3, end_row = 4) %>%
+  pack_rows(group_label = "Lose Connection", start_row = 3, end_row = 4) %>%
+  pack_rows(group_label = "Always Connected", start_row = 5, end_row = 6) %>%
   pack_rows("", 5, 5, indent = FALSE, latex_gap_space = "-0.3em") %>%
   write(file = paste0(objects_path, "hosp_group_stats.tex"))
 
-# table: outcome variables by group broken down by pre- and post------------------------------------------------------
+# table and graphs: outcome variables by group broken down by pre- and post------------------------------------------------------
+
 # define the groups
 hospital_data <- hospital_data %>%
-  mutate(group = ifelse(become_same==1 & (minyr_diffHRR_part>minyr_sameHRR_part | minyr_diffHRR_part==0), "Become Connected Same", NA)) %>%
+  mutate(group = ifelse(become_same==1, "Become Connected Same", NA)) %>%
   mutate(group = ifelse(never_same==1 & never_diff==1, "Never Connected", group)) %>%
-  mutate(group = ifelse(become_diff==1 & is.na(group), "Become Connected Different", group))
+  mutate(group = ifelse(become_diff==1 & is.na(group), "Become Connected Different", group)) %>%
+  mutate(group = ifelse(always_diff==1 & is.na(group), "Always Connected Different", group))
+
+# set desired order of groups
+desired_order <- c("Become Connected Same", "Become Connected Different", "Always Connected Different", "Never Connected")
 
 # create relative year variable
 outcome_table <- hospital_data %>%
@@ -578,13 +655,13 @@ outcome_table <- hospital_data %>%
   mutate(rel_year = ifelse(group=="Become Connected Different", minyr_diffHRR_part-TaxYr, rel_year))
 
 p_values_relative <- outcome_table %>%
-  filter(minyr_sameHRR_part != 2023 & minyr_diffHRR_part != 2023) %>%
   filter(!is.na(rel_year)) %>%
   filter(rel_year < 4 & rel_year > -4) %>%
   pivot_longer(
-    cols = c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc",
-             "build_purch", "fixedequipment_purch", "movableequipment_purch",
-             "tot_pat_rev", "tot_operating_exp"),
+    cols = c("mcaid_discharges", "mcare_discharges", "tot_discharges",
+             "bed_conc", "any_purch", 
+             "tot_operating_exp", "num_services",
+             "closure", "independent"),
     names_to = "variable",
     values_to = "value"
   ) %>%
@@ -609,8 +686,10 @@ outcome_table_relative <- outcome_table %>%
   filter(minyr_sameHRR_part!=2023 & minyr_diffHRR_part!=2023) %>%
   filter(!is.na(rel_year)) %>%
   group_by(rel_year, group) %>%
-  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
-                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
+  summarise_at(c("mcaid_discharges", "mcare_discharges", "tot_discharges",
+                 "bed_conc", "any_purch", 
+                 "tot_operating_exp", "num_services",
+                 "closure", "independent"), list(m=mean), na.rm=T) %>%
   pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
   filter(rel_year<4 & rel_year>-4) %>%
   mutate(timing = ifelse(rel_year < -1, "Pre", "Post")) %>%
@@ -622,8 +701,10 @@ outcome_table_relative <- outcome_table %>%
 outcome_table_other <- outcome_table %>%
   filter(is.na(rel_year)) %>%
   group_by(TaxYr, group) %>%
-  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
-                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
+  summarise_at(c("mcaid_discharges", "mcare_discharges", "tot_discharges",
+                 "bed_conc", "any_purch", 
+                 "tot_operating_exp", "num_services",
+                 "closure", "independent"), list(m=mean), na.rm=T) %>%
   pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
   group_by(group, variable) %>%
   summarise(Pre=mean(mean))
@@ -633,14 +714,14 @@ outcome_table <- bind_rows(outcome_table_relative, outcome_table_other) %>%
   mutate(Pre = ifelse(abs(Pre)>10000, Pre/100000, Pre),
          Post = ifelse(abs(Post)>10000, Post/100000, Post),
          difference = ifelse(abs(difference)>10000, difference/100000, difference)) %>%
-  mutate(group = factor(group, levels = c("Become Connected Same", "Become Connected Different", "Never Connected"))) %>%
+  mutate(group = factor(group, levels = c("Become Connected Same", "Become Connected Different", "Always Connected Different", "Never Connected"))) %>%
   arrange(group) %>%
   arrange(variable)
 
 outcome_table %>% ungroup() %>%
   select(-variable) %>%
   knitr::kable(format = "latex",
-               col.names = c("Sample of Hospitals", "Pre- Mean", "Post- Mean", "Post - Pre", "P-Value"),
+               col.names = c("Sample of Hospitals", "Avg Pre", "Avg Post", "Post - Pre", "P-Value"),
                caption = "Outcome Variables Over Time\\label{tab:outcome_tab}",
                row.names = FALSE,
                table.envir="table",
@@ -650,18 +731,18 @@ outcome_table %>% ungroup() %>%
                align=c("l","c","c","c","c","c","c","c","c"),
                position="hp!",
                linesep = "") %>%
-  pack_rows(group_label = "Bed Concentration", start_row = 1, end_row = 3) %>%
-  pack_rows(group_label = "Building Purchases (/100k)", start_row = 4, end_row = 6) %>%
-  pack_rows(group_label = "Fixed Equipment Purchases (/100k)", start_row = 7, end_row = 9) %>%
-  pack_rows(group_label = "Movable Equipment Purchases (/100k)", start_row = 10, end_row = 12) %>%
-  pack_rows(group_label = "Percent Patients Medicaid", start_row = 13, end_row = 15) %>%
-  pack_rows(group_label = "Percent Patients Medicare", start_row = 16, end_row = 18) %>%
-  pack_rows(group_label = "Total Discharges", start_row = 19, end_row = 21) %>%
-  pack_rows(group_label = "Total Operating Expenses (/100k)", start_row = 22, end_row = 24) %>%
-  pack_rows(group_label = "Patient Revenue (/100k)", start_row = 25, end_row = 27) %>%
+  pack_rows(group_label = "Any Purchases (/100k)", start_row = 1, end_row = 4) %>%
+  pack_rows(group_label = "Bed Concentration", start_row = 5, end_row = 8) %>%
+  pack_rows(group_label = "Closure", start_row = 9, end_row = 12) %>%
+  pack_rows(group_label = "Independent", start_row = 13, end_row = 16) %>%
+  pack_rows(group_label = "Medicaid Discharges", start_row = 17, end_row = 20) %>%
+  pack_rows(group_label = "Medicare Discharges", start_row = 21, end_row = 24) %>%
+  pack_rows(group_label = "Number of Services", start_row = 25, end_row = 28) %>%
+  pack_rows(group_label = "Total Discharges", start_row = 29, end_row = 32) %>%
+  pack_rows(group_label = "Total Operating Expenses (/100k)", start_row = 33, end_row = 36) %>%
   write(file = paste0(objects_path, "hosp_outcomes_table.tex"))
 
-# now make graphs of each for the outcomes 
+# now make graphs of each of the outcomes 
 outcome_graphs <- hospital_data %>%
   filter(!is.na(group)) %>%
   mutate(TaxYr = as.numeric(TaxYr),
@@ -671,71 +752,35 @@ outcome_graphs <- hospital_data %>%
   mutate(rel_year = ifelse(group=="Become Connected Different", minyr_diffHRR_part-TaxYr, rel_year))
 
 outcome_graphs_relative <- outcome_graphs %>%
-  filter(minyr_sameHRR_part!=2023 & minyr_diffHRR_part!=2023) %>%
   filter(!is.na(rel_year)) %>%
   group_by(rel_year, group) %>%
-  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
-                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
+  summarise_at(c("mcaid_discharges", "mcare_discharges", "tot_discharges",
+                 "bed_conc", "any_purch", 
+                 "tot_operating_exp", "num_services",
+                 "closure", "independent"), list(m=mean), na.rm=T) %>%
   pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") %>%
-  filter(rel_year<4 & rel_year>-4) 
+  filter(rel_year<=4 & rel_year>=-4) 
 outcome_graphs_other <- outcome_graphs %>%
   filter(is.na(rel_year)) %>%
   group_by(TaxYr, group) %>%
-  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
-                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp"), list(m=mean), na.rm=T) %>%
+  summarise_at(c("mcaid_discharges", "mcare_discharges", "tot_discharges",
+                 "bed_conc", "any_purch", 
+                 "tot_operating_exp", "num_services",
+                 "closure", "independent"), list(m=mean), na.rm=T) %>%
   pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean") 
 
 graphs <- bind_rows(outcome_graphs_relative, outcome_graphs_other)
 
 
 # graph for operating expenses
-graphs %>%
-  filter(variable=="tot_operating_exp_m") %>%
+expenses_graph <- graphs %>%
+  filter(variable %in% c("tot_operating_exp_m", "any_purch_m")) %>%
   mutate(mean = mean/100000) %>%
+  mutate(variable = ifelse(variable == "tot_operating_exp_m", "Total Operating Expenses", "Investments (Building/Equipment)")) %>%
   mutate(
     axis_type = case_when(
       group %in% c("Become Connected Same", "Become Connected Different") ~ "Relative Year",
-      group == "Never Connected" ~ "Year",
-      TRUE ~ "Unknown axis"
-    ),
-    x_display = if_else(axis_type == "Relative Year", rel_year, TaxYr)
-  ) %>%
-  filter(!is.na(x_display)) %>%
-  ggplot(aes(x = x_display, y = mean, color = group)) +
-  geom_line() +
-  geom_point(size = 2) +
-  facet_wrap(~ axis_type, scales = "free_x", nrow = 1) +
-  scale_color_brewer(palette = "Dark2") +
-  labs(
-    x = NULL,                       # Strip labels will communicate the axis
-    y = "Total Operating Expenses (/100,000)\n",
-    color = "Group",
-  ) +
-  theme_minimal(base_size = 12) +
-  theme(
-    legend.position = "bottom",
-    strip.text = element_text(face = "bold")
-  ) + ylim(0,3000) + theme(element_text(family = "serif", size=13)) +
-  geom_segment(
-    data = data.frame(axis_type = "Relative Year", x = 0, xend = 0, y = 0, yend = 3000),
-    aes(x = x, xend = xend, y = y, yend = yend),
-    linetype = "dashed", color = "gray", inherit.aes = FALSE
-  ) %>%
-  ggsave(filename = paste0(objects_path, "tot_oper_exp_graph.pdf"), width = 6, height = 4, units = "in")
-
-# graph for percent medicaid and percent medicare
-
-library(dplyr)
-library(ggplot2)
-
-# Build plot
-(graphs %>%
-  filter(variable %in% c("perc_mcaid_m", "perc_mcare_m")) %>%
-  mutate(variable = ifelse(variable == "perc_mcaid_m", "Percent Medicaid", "Percent Medicare")) %>%
-  mutate(
-    axis_type = case_when(
-      group %in% c("Become Connected Same", "Become Connected Different") ~ "Relative Year",
-      group == "Never Connected" ~ "Year",
+      group %in% c("Never Connected", "Always Connected Different") ~ "Year",
       TRUE ~ "Unknown axis"
     ),
     x_display = dplyr::if_else(axis_type == "Relative Year", rel_year, TaxYr)
@@ -746,31 +791,31 @@ library(ggplot2)
   geom_point(size = 2) +
   facet_wrap(~ axis_type, scales = "free_x", nrow = 1) +
   # Legends: color (Group) on top; shape + linetype (Patient type) below
-  scale_color_brewer(name = "Group", palette = "Dark2") +
+  scale_color_brewer(name = "Group", palette = "Dark2", breaks = desired_order) +
   scale_shape_manual(
-    name = "Patient type",
-    values = c("Percent Medicaid" = 16, "Percent Medicare" = 17)  # circle, triangle
+    name = "Expenses",
+    values = c("Total Operating Expenses" = 16, "Investments (Building/Equipment)" = 17)  # circle, triangle
   ) +
   scale_linetype_manual(
-    name = "Patient type",
-    values = c("Percent Medicaid" = "solid", "Percent Medicare" = "dashed")
+    name = "Expenses",
+    values = c("Total Operating Expenses" = "solid", "Investments (Building/Equipment)" = "dashed")
   ) +
   labs(
     x = NULL,                       # strip labels communicate the axis
-    y = "Patient Type\n"
+    y = "Expenses (/100k)\n"
   ) +
-  theme_minimal(base_size = 12, base_family = "serif") +
+  theme_minimal(base_size = 13, base_family = "serif") +
   theme(
-    legend.position = "bottom",      # stack legends vertically
+    legend.position = "right",     
     legend.direction = "vertical",
     strip.text = element_text(face = "bold"),
     legend.key.width  = unit(18, "pt"),
     legend.key.height = unit(14, "pt")
   ) +
-  ylim(0, 0.5) +
+  ylim(0, 5000) +
   # vertical marker (only in Relative Year facet)
   geom_segment(
-    data = data.frame(axis_type = "Relative Year", x = -0.5, xend = -0.5, y = 0, yend = 0.5),
+    data = data.frame(axis_type = "Relative Year", x = -0.5, xend = -0.5, y = 0, yend = 5000),
     aes(x = x, xend = xend, y = y, yend = yend),
     linetype = "dashed", color = "gray", size = 1, inherit.aes = FALSE
   ) +
@@ -779,99 +824,151 @@ library(ggplot2)
     color    = guide_legend(order = 1),
     shape    = guide_legend(order = 2),
     linetype = guide_legend(order = 2)
-  )) %>%
-  ggsave(filename = paste0(objects_path, "perc_patients_graphs.pdf"), width = 8, height = 4, units = "in")
+  ) +
+  scale_x_continuous( breaks = function(x) seq(floor(min(x)), ceiling(max(x)), by = 2),    
+                      labels = scales::number_format(accuracy = 1))
 
+# graph for discharges
+disch_graph <- graphs %>%
+  filter(variable %in% c("mcaid_discharges_m", "mcare_discharges_m", "tot_discharges_m")) %>%
+  mutate(variable = ifelse(variable == "mcaid_discharges_m", "Medicaid Discharges", variable)) %>%
+  mutate(variable = ifelse(variable == "mcare_discharges_m", "Medicare Discharges", variable)) %>%
+  mutate(variable = ifelse(variable == "tot_discharges_m", "Total Discharges", variable)) %>%
+  mutate(
+    axis_type = case_when(
+      group %in% c("Become Connected Same", "Become Connected Different") ~ "Relative Year",
+      group %in% c("Never Connected", "Always Connected Different") ~ "Year",
+      TRUE ~ "Unknown axis"
+    ),
+    x_display = dplyr::if_else(axis_type == "Relative Year", rel_year, TaxYr)
+  ) %>%
+  filter(!is.na(x_display)) %>%
+  ggplot(aes(x = x_display, y = mean, color = group, linetype = variable, shape = variable)) +
+  geom_line() +
+  geom_point(size = 2) +
+  facet_wrap(~ axis_type, scales = "free_x", nrow = 1) +
+  # Legends: color (Group) on top; shape + linetype (Patient type) below
+  scale_color_brewer(name = "Group", palette = "Dark2", breaks = desired_order) +
+  scale_shape_manual(
+    name = "Patient type",
+    values = c("Medicare Discharges" = 16, "Medicaid Discharges" = 17, "Total Discharges"=18)  # circle, triangle
+  ) +
+  scale_linetype_manual(
+    name = "Patient type",
+    values = c("Medicare Discharges" = "dotted", "Medicaid Discharges" = "dashed", "Total Discharges"="solid")
+  ) +
+  labs(
+    x = NULL,                       # strip labels communicate the axis
+    y = "Discharges\n"
+  ) +
+  theme_minimal(base_size = 13, base_family = "serif") +
+  theme(
+    legend.position = "right",     
+    legend.direction = "vertical",
+    strip.text = element_text(face = "bold"),
+    legend.key.width  = unit(18, "pt"),
+    legend.key.height = unit(14, "pt")
+  ) +
+  ylim(0, 10000) +
+  # vertical marker (only in Relative Year facet)
+  geom_segment(
+    data = data.frame(axis_type = "Relative Year", x = -0.5, xend = -0.5, y = 0, yend = 10000),
+    aes(x = x, xend = xend, y = y, yend = yend),
+    linetype = "dashed", color = "gray", size = 1, inherit.aes = FALSE
+  ) +
+  # Legend order: color first, then shape & linetype
+  guides(
+    color    = guide_legend(order = 1),
+    shape    = guide_legend(order = 2),
+    linetype = guide_legend(order = 2)
+  ) +
+  scale_x_continuous( breaks = function(x) seq(floor(min(x)), ceiling(max(x)), by = 2),    
+                      labels = scales::number_format(accuracy = 1))
+                         
 
-# Save (PDF). Use cairo_pdf to handle fonts better; switch to PNG if needed.
-ggsave(
-  filename = paste0(objects_path, "perc_patients_graphs.pdf"),
-  plot = p,
-  width = 8, height = 4, units  width = 8, height = 4, units = "in",
-  device = cairo_pdf
-  
-
-# graph for bed concentration
-(graphs %>%
-    filter(variable=="bed_conc_m") %>%
+# graph for number of services
+num_services_graph <- graphs %>%
+    filter(variable=="num_services_m") %>%
     mutate(
       axis_type = case_when(
         group %in% c("Become Connected Same", "Become Connected Different") ~ "Relative Year",
-        group == "Never Connected" ~ "Year",
+        group %in% c("Never Connected", "Always Connected Different") ~ "Year",
         TRUE ~ "Unknown axis"
       ),
       x_display = if_else(axis_type == "Relative Year", rel_year, TaxYr)
     ) %>%
     filter(!is.na(x_display)) %>%
-    ggplot(aes(x = x_display, y = mean, color = group, linetype = variable, shape = variable)) +
+    ggplot(aes(x = x_display, y = mean, color = group)) +
     geom_line() +
     geom_point(size = 2) +
     facet_wrap(~ axis_type, scales = "free_x", nrow = 1) +
-    scale_color_brewer(palette = "Dark2") +
+    scale_color_brewer(name = "Group", palette = "Dark2", breaks = desired_order) +
     labs(
       x = NULL,                       # Strip labels will communicate the axis
-      y = "Bed Concentration\n",
+      y = "Number of Services\n",
       color = "Group",
     ) +
-    theme_minimal(base_size = 12) +
+    theme_minimal(base_size = 12, base_family = "serif") +
     theme(
-      legend.position = "bottom",
-      strip.text = element_text(face = "bold")
-    ) + ylim(0,1) + theme(element_text(family = "serif", size=13)) +
+      legend.position = "bottom",     
+      legend.direction = "vertical",
+      strip.text = element_text(face = "bold"),
+      legend.key.width  = unit(18, "pt"),
+      legend.key.height = unit(14, "pt")
+    ) + ylim(0,200) + theme(element_text(family = "serif", size=13)) +
     geom_segment(
-      data = data.frame(axis_type = "Relative Year", x = -0.5, xend = -0.5, y = 0, yend = 1),
+      data = data.frame(axis_type = "Relative Year", x = -0.5, xend = -0.5, y = 0, yend = 200),
       aes(x = x, xend = xend, y = y, yend = yend),
-      linetype = "dashed", color = "gray", linewidth =1, inherit.aes = FALSE
-    ) + theme(legend.title = element_blank()))  %>%
-  ggsave(filename = paste0(objects_path, "bed_conc_graph.pdf"), width = 6, height = 4, units = "in")
-
-
-
-
-
-
-
-
-    
-         
-
-graphs %>%
-  filter(variable %in% c("tot_operating_exp_m")) %>%
-  ggplot(aes(x=rel_year, y=mean, color=group, linetype=variable)) + geom_line() +
-  theme_minimal() + xlim(-3,3) + scale_x_continuous(name = "Relative Year", sec.axis = sec_axis(TaxYr, name = "Year"))
-treat_stats %>%
-  filter(variable %in% c("perc_mcaid_m", "perc_mcare_m", "bed_conc_m")) %>%
-  ggplot(aes(x=rel_year, y=mean, color=group, linetype=variable)) + geom_line() +
-  theme_minimal() + xlim(-3,3) 
-treat_stats %>%
-  filter(variable %in% c("fixedequipment_purch_m", "build_purch_m", "movableequipment_purch_m")) %>%
-  ggplot(aes(x=rel_year, y=mean, color=group, linetype=variable)) + geom_line() +
-  theme_minimal() + xlim(-3,3)
-treat_stats %>%
-  filter(variable %in% c("tot_pat_rev_m")) %>%
-  ggplot(aes(x=rel_year, y=mean, color=group, linetype=variable)) + geom_line() +
-  theme_minimal() + xlim(-3,3)
-
-# from this, there are several variables where it seems like something is going on! I need to really pin
-# down my story though and not just throw darts to see what sticks. 
-# think about pre-trends because it could be hospitals who are financially struggling that
-# make the choice to form partnerships with other hospitals. 
-
-stats <- hospital_data %>%
-  filter(group %in% c("Never Connected", "Always Connected Different")) %>%
-  group_by(TaxYr, group) %>%
-  summarise_at(c("perc_mcaid", "perc_mcare", "tot_discharges", "bed_conc", "build_purch", "fixedequipment_purch",
-                 "movableequipment_purch", "tot_pat_rev", "tot_operating_exp", "cost_to_charge"), list(m=mean), na.rm=T) %>%
-  pivot_longer(cols = ends_with("_m"), names_to = "variable", values_to = "mean")
-
-stats %>%
-  filter(variable %in% c("perc_mcaid_m", "perc_mcare_m")) %>%
-  ggplot() + geom_line(aes(x=TaxYr, y=mean, color=variable, linetype=group)) +
-  theme_minimal()
-  
-  
-  
-  
-  
+      linetype = "dashed", color = "gray", inherit.aes = FALSE
+    )
   
 
+# group patient and service outcomes together for the paper
+# 1. Extract patient type legend only (remove group legend completely)
+disch_legend <- get_legend(
+  disch_graph +
+    guides(color = "none") +                # drop group legend
+    theme(legend.position = "bottom",
+          legend.direction = "horizontal")  # force horizontal
+)
+
+# 2. Remove patient type legend AND group legend from num_services itself
+disch_no_legends <- disch_graph +
+  guides(color = "none", shape = "none", linetype = "none") +
+  theme(legend.position = "none")
+
+# 3. Stack disch_graph with its legend
+disch_with_legend <- cowplot::plot_grid(
+  disch_no_legends, disch_legend,
+  ncol = 1, rel_heights = c(1, 0.15)
+)
+
+exp_legend <- get_legend(
+  expenses_graph +
+    guides(color = "none") +                # drop group legend
+    theme(legend.position = "bottom",
+          legend.direction = "horizontal")  # force horizontal
+)
+
+# 2. Remove patient type legend AND group legend from num_services itself
+exp_no_legends <- expenses_graph +
+  guides(color = "none", shape = "none", linetype = "none") +
+  theme(legend.position = "none")
+
+# 3. Stack disch_graph with its legend
+exp_with_legend <- cowplot::plot_grid(
+  exp_no_legends, exp_legend,
+  ncol = 1, rel_heights = c(1, 0.15)
+)
+
+# 4. Arrange all three plots with a common group legend to the right
+final_plot <- ggarrange(
+  num_services_graph + theme(legend.position="none"),
+  disch_with_legend,
+  exp_with_legend,
+  nrow = 3, ncol = 1,
+  common.legend = TRUE,
+  legend = "bottom"   # group legend stacked vertically
+)
+
+ggsave(final_plot, filename = paste0(objects_path, "outcome_desc_graph.pdf"), width = 7, height=10, units = "in")

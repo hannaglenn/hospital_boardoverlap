@@ -264,7 +264,8 @@ identify_common_members <- function(data) {
 # Clean up the names ----------------------------------------------------------------------------------------
 
 # Read in cleaned up version of names found in 990 tax forms
-people <- read_rds(paste0(created_data_path, "cleaned_people_data.rds"))
+people <- read_rds(paste0(created_data_path, "cleaned_people_data_new.rds")) %>%
+  filter(TaxYr!=2025)
 
 # map nicknames to longer versions
 people <- normalize_nicknames(people, nickname_map)
@@ -307,20 +308,10 @@ people <- people %>%
 # assign unique identifiers to names that share at least 2 tokens across firm, years
 people <- assign_person_id(people)
 
+saveRDS(people, paste0(created_data_path, "people.rds"))
+
 # Create variables of board members connected to multiple EINs ---------------------------------------------------
 connections <- identify_common_members(people)
-
-# only keep EINs that are present in enough years
-ein_keep <- connections %>%
-  distinct(Filer.EIN, TaxYr) %>%
-  mutate(count=ifelse(TaxYr %in% c(2017,2018,2019,2020,2021),1,0)) %>%
-  group_by(Filer.EIN) %>%
-  filter(sum(count)>=5) %>%
-  ungroup() %>%
-  distinct(Filer.EIN)
-
-connections <- connections %>%
-  filter(Filer.EIN %in% unique(ein_keep$Filer.EIN))
 
 # pivot longer
 connections <- connections %>%
@@ -385,28 +376,28 @@ connections <- connections %>%
 hospital_data <- connections %>%
   distinct(TaxYr, Filer.EIN) %>%
   left_join(cw) %>%
-  rename(Filer.ID=ID)
+  rename(Filer.ID=ID) 
 
 # Get rid of duplicates
 connections <- connections %>%
-  distinct()
-
+  select(-other) %>%
+  distinct() 
 
 # join AHA information to the filer and other id
-AHA <- read_csv(paste0(raw_data_path, "\\AHAdata_20052023.csv")) 
+AHA <- read_csv(paste0(raw_data_path, "/AHAdata_20052023.csv")) 
 
 AHA_hrr <- AHA %>%
   select(ID, YEAR, HRRCODE, SYSID, NETNAME, MNAME, SERV, LAT, LONG) %>%
-  filter(YEAR>=2015 & YEAR<=2023) %>%
-  mutate(YEAR = as.character(YEAR)) %>%
+  filter(YEAR>=2013 & YEAR<=2023) %>%
   distinct(ID, YEAR, .keep_all = TRUE)
 
 # complete AHA data for variables we can extrapolate
 AHA_hrr <- AHA_hrr %>%
   group_by(ID) %>%
   mutate(YEAR=as.numeric(YEAR)) %>%
-  complete(YEAR = c(2015:2023)) %>%
+  complete(YEAR = c(2013:2023)) %>%
   fill(HRRCODE, MNAME, SERV, LAT, LONG, .direction="downup") %>%
+  ungroup() %>%
   mutate(YEAR=as.character(YEAR))
 
 connections <- connections %>%
@@ -426,6 +417,7 @@ connections <- connections %>%
 # pick up on shared systems using name distance metric
 connections <- connections %>%
   mutate(name_dist = stringdist::stringdist(str_extract(filer.name,"[A-Za-z]+\\s"), str_extract(other.name,"[A-Za-z]+\\s"), method = "jw")) 
+  # I checked that using name_dist==0 is a good choice!
 
 # create categories
 connections <- connections %>%
@@ -451,8 +443,7 @@ create_affiliation_indicators <- function(data, affiliation_col, filer_hrr_col, 
   return(data)
 }
 
-# Example usage:
-categories <- c("formal", "informal", "partnership")
+categories <- c("formal", "partnership")
 connections <- create_affiliation_indicators(connections, "affiliation", "filer.hrr", "other.hrr", categories)
 
 people_connections <- connections %>%
@@ -468,8 +459,6 @@ people_connections <- connections %>%
     person_positions = first(person_positions),
     formal_sameHRR = max(formal_sameHRR),
     formal_diffHRR = max(formal_diffHRR),
-    informal_sameHRR = max(informal_sameHRR),
-    informal_diffHRR = max(informal_diffHRR),
     partnership_sameHRR = max(partnership_sameHRR),
     partnership_diffHRR = max(partnership_diffHRR)
   )
@@ -480,9 +469,12 @@ saveRDS(people_connections, file=paste0(created_data_path, "people_connections_b
 # summarize connections at the hospital level -----------------------------------------------
 # create hospital-level connections data set for making a map showing the connections
 hospital_connections <- connections %>%
+  group_by(Filer.EIN) %>%
+  mutate(overlap_type = list(unique(person_positions))) %>%
+  ungroup() %>%
   distinct(TaxYr, Filer.EIN, Filer.ID, filer.hrr, filer.sysid, filer.name, filer.type, filer.lat, filer.long, filer.net, 
            other_ein, other.id, other.hrr, other.sysid, other.name, other.type, other.lat, other.long, other.net,
-           formal_sameHRR, formal_diffHRR, informal_sameHRR, informal_diffHRR, partnership_sameHRR, partnership_diffHRR, 
+           formal_sameHRR, formal_diffHRR, partnership_sameHRR, partnership_diffHRR, 
            overlap_count, overlap_percent) 
 saveRDS(hospital_connections, file=paste0(created_data_path, "hospital_connections_boardandexec.rds"))
 
@@ -491,14 +483,11 @@ hospital_connections <- connections %>%
   group_by(TaxYr, Filer.EIN) %>%
   mutate(any_formal_sameHRR = max(formal_sameHRR),
          any_formal_diffHRR = max(formal_diffHRR),
-         any_informal_sameHRR = max(informal_sameHRR),
-         any_informal_diffHRR = max(informal_diffHRR),
          any_partnership_sameHRR = max(partnership_sameHRR),
          any_partnership_diffHRR = max(partnership_diffHRR)) %>%
   ungroup() %>%
   distinct(TaxYr, Filer.EIN,
            any_formal_sameHRR, any_formal_diffHRR,
-           any_informal_sameHRR, any_informal_diffHRR,
            any_partnership_sameHRR, any_partnership_diffHRR)
 
 
@@ -510,8 +499,6 @@ hospital_data <- hospital_data %>%
 hospital_data <- hospital_data %>%
   mutate(any_formal_sameHRR = ifelse(is.na(any_formal_sameHRR),0,any_formal_sameHRR),
          any_formal_diffHRR = ifelse(is.na(any_formal_diffHRR),0,any_formal_diffHRR),
-         any_informal_sameHRR = ifelse(is.na(any_informal_sameHRR),0,any_informal_sameHRR),
-         any_informal_diffHRR = ifelse(is.na(any_informal_diffHRR),0,any_informal_diffHRR),
          any_partnership_sameHRR = ifelse(is.na(any_partnership_sameHRR),0,any_partnership_sameHRR),
          any_partnership_diffHRR = ifelse(is.na(any_partnership_diffHRR),0,any_partnership_diffHRR))
 
@@ -521,42 +508,197 @@ minyr_sameHRR_partnership <- hospital_data %>%
   filter(any_partnership_sameHRR==1) %>%
   group_by(Filer.EIN) %>%
   mutate(minyr_sameHRR_part = min(TaxYr)) %>%
+  mutate(maxyr_sameHRR_part = max(TaxYr)) %>%
   ungroup() %>%
-  distinct(Filer.EIN, minyr_sameHRR_part)
+  distinct(Filer.EIN, minyr_sameHRR_part, maxyr_sameHRR_part)
 minyr_diffHRR_partnership <- hospital_data %>%
   filter(any_partnership_diffHRR==1) %>%
   group_by(Filer.EIN) %>%
   mutate(minyr_diffHRR_part = min(TaxYr)) %>%
+  mutate(maxyr_diffHRR_part = max(TaxYr)) %>%
   ungroup() %>%
-  distinct(Filer.EIN, minyr_diffHRR_part)
+  distinct(Filer.EIN, minyr_diffHRR_part, maxyr_diffHRR_part)
+
+# do the same for formal affiliation
+minyr_sameHRR_formal <- hospital_data %>%
+  filter(any_formal_sameHRR==1) %>%
+  group_by(Filer.EIN) %>%
+  mutate(minyr_sameHRR_formal = max(TaxYr)) %>%
+  mutate(maxyr_sameHRR_formal = max(TaxYr)) %>%
+  ungroup() %>%
+  distinct(Filer.EIN, minyr_sameHRR_formal, maxyr_sameHRR_formal)
 
 # merge back to data
 hospital_data <- hospital_data %>%
   left_join(minyr_sameHRR_partnership, by="Filer.EIN") %>%
-  left_join(minyr_diffHRR_partnership, by="Filer.EIN") 
+  left_join(minyr_diffHRR_partnership, by="Filer.EIN") %>%
+  left_join(minyr_sameHRR_formal, by="Filer.EIN") 
 
 hospital_data <- hospital_data %>%
   ungroup() %>%
   mutate(minyr_sameHRR_part = ifelse(is.na(minyr_sameHRR_part),0,minyr_sameHRR_part)) %>%
-  mutate(minyr_diffHRR_part = ifelse(is.na(minyr_diffHRR_part),0,minyr_diffHRR_part))
+  mutate(minyr_diffHRR_part = ifelse(is.na(minyr_diffHRR_part),0,minyr_diffHRR_part)) %>%
+  mutate(maxyr_sameHRR_part = ifelse(is.na(maxyr_sameHRR_part),0,maxyr_sameHRR_part)) %>%
+  mutate(maxyr_diffHRR_part = ifelse(is.na(maxyr_diffHRR_part),0,maxyr_diffHRR_part)) %>%
+  mutate(minyr_sameHRR_formal = ifelse(is.na(minyr_sameHRR_formal),0,minyr_sameHRR_formal)) %>%
+  mutate(maxyr_sameHRR_formal = ifelse(is.na(maxyr_sameHRR_formal),0,maxyr_sameHRR_formal)) 
 
-# Merge outcome variables
-AHA_variables <- AHA %>%
+# complete the data but keep leadership variables NA
+hospital_data <- hospital_data %>%
+  mutate(TaxYr = as.numeric(TaxYr)) %>%
+  group_by(Filer.EIN) %>%
+  complete(TaxYr = c(2013:2023)) %>%
+  fill(Filer.ID, .direction="downup") %>%
+  ungroup()
+
+# Merge outcome and control variables
+AHA_hosp <- AHA %>%
   select(YEAR, ID, SYSID, HRRCODE, LAT, LONG, MAPP5, MCRNUM, SERV,
-         GENBD, PEDBD, OBBD, MSICBD, CICBD, NICBD, NINTBD, PEDICBD, SYSID,
-         BRNBD, SPCICBD, REHABBD, OTHICBD, ACULTBD, ALCHBD, PSYBD, SNBD88, ICFBD88,
-         OTHLBD94, OTHBD94, HOSPBD,
+         ends_with("BD")|ends_with("BD94")|ends_with("BD88"),
          FTMT, FTRNTF,
          ICLABHOS, ACLABHOS,
-         MCDDC, MCRDC)
-hospital_data <- hospital_data %>%
-  mutate(TaxYr=as.numeric(TaxYr)) %>%
-  left_join(AHA_variables, by = c("TaxYr"="YEAR", "Filer.ID"="ID"))
+         MCDDC, MCRDC,
+         MAPP3, MAPP5, MAPP8, BDTOT,
+         JNTMD,
+         ends_with("HOS")) 
+
+# create hospital types  
+AHA_hosp <- AHA_hosp %>%
+  mutate(
+    # hosptype1: equivalent to type1_aha
+    hosptype1 = dplyr::case_when(
+      SERV == 10 ~ 1L,
+      SERV %in% c(11, 12, 13, 22, 33, 41, 42, 44, 45, 46, 47, 48, 49) ~ 2L,
+      SERV == 18 ~ 3L,
+      SERV == 50 ~ 4L,
+      SERV %in% c(51, 52, 53, 55, 56, 57, 58, 59, 90, 91) ~ 5L,
+      SERV %in% c(62, 80, 82) ~ 6L,
+      TRUE ~ NA_integer_
+    ),
+    hosptype1 = factor(
+      hosptype1, levels = 1:6,
+      labels = c(
+        "General medical/surgical",
+        "Specialty",
+        "Rural",
+        "Children's general medical/surgical",
+        "Children's specialty",
+        "Other"
+      )
+    ),
+    #hosptype2: equivalent to type2_aha, based on hosptype1
+    hosptype2 = dplyr::case_when(
+      hosptype1 %in% c("General medical/surgical",
+                       "Children's general medical/surgical") ~ 1L,
+      hosptype1 %in% c("Specialty",
+                       "Children's specialty") ~ 2L,
+      hosptype1 %in% c("Rural", "Other") ~ 3L,
+      TRUE ~ NA_integer_
+    ),
+    hosptype2 = factor(
+      hosptype2, levels = 1:3,
+      labels = c(
+        "General medical/surgical",
+        "Specialty",
+        "Other"
+      )
+    )
+  )
+
+# create indicator for system
+AHA_hosp <- AHA_hosp %>%
+  mutate(independent = ifelse(is.na(SYSID),1,0))
+
+# create teaching hospital indicators
+AHA_hosp <- AHA_hosp %>%
+  mutate(
+    # teaching1_aha: start at 3 ("Not Teaching"), then update
+    teaching1_aha = 3L,
+    teaching1_aha = ifelse(MAPP8 == 1, 1L, teaching1_aha),
+    teaching1_aha = ifelse(
+      teaching1_aha == 3L & (MAPP3 == 1 | MAPP5 == 1),
+      2L,
+      teaching1_aha
+    ),
+    teaching1_aha = factor(
+      teaching1_aha,
+      levels = c(1L, 2L, 3L),
+      labels = c("Major Teaching", "Minor Teaching", "Not Teaching")
+    ),
+    
+    # teaching2_aha: 0/1 then factor with labels
+    teaching2_aha = 0L,
+    teaching2_aha = ifelse(
+      teaching1_aha %in% c("Major Teaching", "Minor Teaching"),
+      1L,
+      teaching2_aha
+    ),
+    teaching2_aha = factor(
+      teaching2_aha,
+      levels = c(0L, 1L),
+      labels = c("Not Teaching", "Teaching")
+    )
+  )
+
+# Only keep hospital type 2 for now, but can go back and change later
+AHA_hosp <- AHA_hosp %>%
+  mutate(type_factor = as.factor(hosptype2)) %>%
+  mutate(teaching = ifelse(teaching2_aha=="Teaching",1,0)) %>%
+  mutate(general = ifelse(hosptype2=="General medical/surgical",1,0)) 
+
+observe <- AHA_hosp %>%
+  filter(is.na(GENBD))
+
+# List all specialty bed columns once
+bed_cols <- c("GENBD","PEDBD","OBBD","MSICBD","CICBD","NICBD","NINTBD","PEDICBD","BRNBD","SPCICBD","OTHICBD","REHABBD","ALCHBD",  "PSYBD","SNBD88","ICFBD88","ACULTBD","OTHLBD94","OTHBD94")
+
+AHA_hosp <- AHA_hosp %>%
+  # Do NOT replace NAs in bed columns; only ensure HOSPBD is non-missing
+  mutate(HOSPBD = tidyr::replace_na(HOSPBD, 0)) %>%
+  # Compute concentration safely: if BDTOT > 0, else NA
+  mutate(
+    bed_conc = if_else(
+      BDTOT > 0,
+      rowSums((as.matrix(select(., all_of(bed_cols))) / BDTOT)^2, na.rm = TRUE),
+      NA_real_
+    )
+  ) %>%
+  arrange(ID, YEAR) %>%
+  group_by(ID) %>%
+  # Create lags for each bed category (keep NAs)
+  mutate(
+    across(all_of(bed_cols), ~ dplyr::lag(.x, 1), .names = "{.col}_lag")
+  ) 
+
+AHA_hosp <- AHA_hosp %>%
+  mutate(bed_conc = ifelse(bed_conc==0,NA,bed_conc))
+
+# Figure out if they start a new service based on the "HOS" columns
+AHA_hosp <- AHA_hosp %>%
+  ungroup() %>%
+  mutate(num_services = rowSums(as.matrix(select(.,ends_with("HOS"))), na.rm=T)) %>%
+  mutate(num_services = ifelse(num_services==0,NA,num_services))
+
+
+
+
+# Only keep the columns I need
+AHA_hosp <- AHA_hosp %>%
+  select(-ends_with("VEN"), -ends_with("BD"), -ends_with("lag"), -ends_with("HOS"),
+         -MAPP5, -MAPP3, -MAPP8, -SERV, -ends_with("BD88"), -ends_with("BD94"), -ends_with("started"),
+         -teaching1_aha, -teaching2_aha) 
+
 
 hospital_data <- hospital_data %>%
-  mutate(bed_conc = (GENBD/HOSPBD)^2 + (PEDBD/HOSPBD)^2 + (OBBD/HOSPBD)^2 + (MSICBD/HOSPBD)^2 + (CICBD/HOSPBD)^2 + (NICBD/HOSPBD)^2 + (NINTBD/HOSPBD)^2 + 
-           (PEDICBD/HOSPBD)^2 + (BRNBD/HOSPBD)^2 + (SPCICBD/HOSPBD)^2 + (OTHICBD/HOSPBD)^2 + (REHABBD/HOSPBD)^2 + (ALCHBD/HOSPBD)^2 + 
-           (PSYBD/HOSPBD)^2 + (SNBD88/HOSPBD)^2 + (ICFBD88/HOSPBD)^2 + (ACULTBD/HOSPBD)^2 + (OTHLBD94/HOSPBD)^2 + (OTHBD94/HOSPBD)^2)
+  mutate(TaxYr = as.numeric(TaxYr)) %>%
+  left_join(AHA_hosp, by=c("TaxYr"="YEAR", "Filer.ID"="ID"))
+
+# Fill MCRNUM and get rid of units with no mcrnum
+hospital_data <- hospital_data %>%
+  group_by(Filer.EIN) %>%
+  fill(MCRNUM, .direction="downup") %>%
+  ungroup() %>%
+  filter(!is.na(MCRNUM))
 
 
 # read in HCRIS data
@@ -564,7 +706,16 @@ hcris <- read_csv(paste0(raw_data_path, "/final_hcris_data.csv"))
 
 hcris <- hcris %>%
   select(provider_number, year, tot_discharges, mcare_discharges, mcaid_discharges, build_purch, fixedequipment_purch,
-         movableequipment_purch, medrecords_expenses, HIT_purch, tot_pat_rev, tot_operating_exp, cost_to_charge)
+         movableequipment_purch, land_purch, HIT_purch, labor_costs, tot_operating_exp, cost_to_charge) %>%
+  mutate(build_purch = abs(build_purch),
+         fixedequipment_purch = abs(fixedequipment_purch),
+         movableequipment_purch = abs(movableequipment_purch),
+         land_purch = abs(land_purch)) %>%
+  rowwise() %>%
+  mutate(any_purch = sum(build_purch, fixedequipment_purch, movableequipment_purch, land_purch, na.rm=T)) %>%
+  ungroup() 
+
+
 hospital_data <- hospital_data %>%
   left_join(hcris, by = c("MCRNUM"="provider_number", "TaxYr"="year"))
 
@@ -573,8 +724,81 @@ hospital_data <- hospital_data %>%
   mutate(perc_mcare = ifelse(!is.na(tot_discharges) & tot_discharges > 0, mcare_discharges / tot_discharges, NA),
          perc_mcaid = ifelse(!is.na(tot_discharges) & tot_discharges > 0, mcaid_discharges / tot_discharges, NA)) 
 
-observe <- hospital_data %>%
-  filter(is.na(tot_discharges))
+
+# Get rid of units where the bed size is too small
+hospital_data <- hospital_data %>%
+  group_by(Filer.EIN) %>%
+  filter(min(BDTOT, na.rm=T)>15) %>%
+  ungroup()
+
+summary(hospital_data)
+
+# Figure out how to represent hospitals that are in the data for the whole time versus drop out for good
+# Make hospital-level indicators
+indicators <- hospital_data %>%
+  arrange(Filer.EIN, TaxYr) %>%
+  group_by(Filer.EIN) %>%
+  summarise(
+    # 1) Non-missing any_partnership_sameHRR in ALL years (2013-2023)
+    any_sameHRR_nonmiss_all = all(!is.na(any_partnership_sameHRR)),
+    
+    # 2) Non-missing any_partnership_sameHRR in 2015-2020
+    any_sameHRR_nonmiss_2014_2021 = {
+      in_window <- TaxYr >= 2014 & TaxYr <= 2021
+      all(!is.na(any_partnership_sameHRR[in_window]))
+    },
+    
+    # 3) Dropout indicator: ≥3 consecutive non-missing for BOTH vars, then missing for the rest
+    dropout_both_ind = {
+      x <- !is.na(any_partnership_sameHRR) & !is.na(BDTOT)  # TRUE when both non-missing
+      if (!any(x)) {
+        FALSE
+      } else {
+        r <- rle(x)                          # run-length encoding of TRUE/FALSE
+        ends <- cumsum(r$lengths)            # end positions of runs
+        true_runs <- which(r$values)         # indices of TRUE runs
+        if (length(true_runs) == 0) {
+          FALSE
+        } else {
+          last_true_run <- tail(true_runs, 1)
+          last_true_end <- ends[last_true_run]
+          run_len <- r$lengths[last_true_run]
+          # Dropout requires: final TRUE run does NOT reach last panel year,
+          # and that terminal TRUE run has length ≥ 3
+          last_true_end < length(x) && run_len >= 3L
+        }
+      }
+    },
+    
+    # Dropout year: first year after the terminal non-missing streak (NA if no dropout)
+    dropout_year = {
+      x <- !is.na(any_partnership_sameHRR) & !is.na(BDTOT)
+      if (!any(x)) {
+        NA_integer_
+      } else {
+        r <- rle(x)
+        ends <- cumsum(r$lengths)
+        true_runs <- which(r$values)
+        if (length(true_runs) == 0) {
+          NA_integer_
+        } else {
+          last_true_run <- tail(true_runs, 1)
+          last_true_end <- ends[last_true_run]
+          run_len <- r$lengths[last_true_run]
+          if (last_true_end < length(x) && run_len >= 3L) {
+            TaxYr[last_true_end] + 1L    # first missing year after the streak
+          } else {
+            NA_integer_
+          }
+        }
+      }
+    },
+    .groups = "drop"
+  )
+
+# If you want these indicators attached back to each row of the panel:
+hospital_data <- hospital_data %>%
+  left_join(indicators, by = "Filer.EIN")
 
 # save hospital data
 saveRDS(hospital_data, file=paste0(created_data_path, "hospital_data_boardandexec.rds"))
