@@ -1,18 +1,20 @@
 library(readr)
 library(stringr)
 library(dplyr)
+library(gender)
 
-created_data_path <- "CreatedData/"
+source("./Scripts/paths.R")
 
 # Script to clean up the name columns of people data scraped from 990s
 
 all_people_data <- readRDS(paste0(created_data_path, "/all_people_data_scheduleH.rds"))
 cw <- readRDS(paste0(created_data_path, "/updated_ein_aha_cw.rds"))
 
-cw <- cw %>%
-  filter(!is.na(ID))
+new_people_data <- readRDS(paste0(created_data_path, "new_xmls_people_data.rds")) %>%
+  rename(PersonNm = person_name, TitleTxt = title, TaxYr = end_year, Filer.EIN=ein) %>%
+  filter(PersonNm != "NONE" & !is.na(PersonNm))
 
-# only keep observations where EIN is found in either ein_hosp or ein_sys
+# only keep observations where EIN is found in the crosswalk
 all_people_data <- all_people_data %>%
   filter(Filer.EIN %in% cw$Filer.EIN)
 
@@ -27,7 +29,7 @@ all_people_data <- all_people_data %>%
 all_people_data <- all_people_data %>%
   mutate(PersonNm = ifelse(is.na(PersonNm), BusinessName_BusinessNameLine1Txt, PersonNm)) %>%
   filter(!is.na(PersonNm) & PersonNm != "'")
-  # this fills all missing person names
+# this fills all missing person names
 
 # Look at missing titles
 observe <- all_people_data %>%
@@ -37,49 +39,82 @@ observe <- all_people_data %>%
 all_people_data <- all_people_data %>%
   filter(!is.na(TitleTxt))
 
-# tabulate the number of unique EINs for every value of TaxYr
-all_people_data %>%
-  group_by(TaxYr) %>%
-  summarise(n = n_distinct(Filer.EIN))
-
-# First goal is to clean up the names. ####
-
 # create data set with only relevant variables
 people_data <- all_people_data %>%
   select(TaxYr, Filer.EIN, PersonNm, TitleTxt)
 
+# join to updated people_data from XMLs that I webscraped
+people_data <- people_data %>%
+  rbind(new_people_data)
+
 # convert to all lowercase
 people_data <- people_data %>%
   mutate(PersonNm = tolower(PersonNm),
-         TitleTxt = tolower(TitleTxt))
+         TitleTxt = tolower(TitleTxt)) %>%
+  distinct()
 
-# create a column for md
+# tabulate the number of unique EINs for every value of TaxYr
+people_data %>%
+  group_by(TaxYr) %>%
+  summarise(n = n_distinct(Filer.EIN))
+
+# Remove 2024
 people_data <- people_data %>%
-  mutate(md = ifelse(str_detect(PersonNm, "\\smd$|\\smd\\s"),1,0)) %>%
-  mutate(md = ifelse(str_detect(TitleTxt, "\\smd$|\\smd\\s"),1,md))
+  filter(TaxYr!=2024)
 
-# create column for DO
+# GOAL 1: GET ANY RELEVANT TITLES FROM THE NAME COLUMN #################
+# I got these lists by going through all of the names with at least 3 words. Don't do this again unless you add more names!!
+doctor_list <- c("md", "do", "urologist", "mdmba")
+other_doctor_list <- c("mbbch", "mbbs", "dds", "dentist", "od", "pharmd", "pt", "radiologist", "physician", "surgeon", "otolaryngologist")
+nurse_list <- c("rn", "dnp", "aprn", "crna", "np", "scn", "fnp", "cne", "fnp-c", "apnp", "fnp-", "cenp", "mphrn", "acnp", "msnrnfaan", "crnp", "msnrn",
+                "eddrn", "dpn", "drnp", "anp", "edrn", "arnp", "pnp", "cnp", "bcccrn")
+ha_list <- c("mha", "fache", "mhadrph", "mhsa", "mhcm", "mhs")
+remove_list <- c("mbbch", "mbbs", "until", "as of", "eff", "end", "beg", "thru", "through", "osb",
+                 "ending", "term", "mph", "deceased", "to", "begin", "left", "see statement", "director", "chair", "hired", "termed",
+                 "began", "retired", "from", "resigned", "off", "vp", "ended", "started", "trm", "dir of", "pd by", "provost",
+                 "start", "oct", "treasurer", "jan", "st", "chief", "t0", "entered", "interim", "board", "fmr", "int", "trustee",
+                 "vice president", "dir", "bh", "vppres", "msn", "mst", "assoc", "departed", "msw", "ceo", "cbe", "secretary", "rsmterm",
+                 "effective", "effec", "former", "admininstrator", "consultant", "cnm", "fellow", "beginning", "president",
+                 "dr", "bishop", "esq", "jr", "sr", "md", "phd", "dds", "ii", "iii", "iv", "ms", "mr", "do","most rev", "rev", "rn", "edd", "cpa", "od",
+                 "the rt", "dnp", "bc", "faan", "mb", "chb", "mbbh", "mbbch", "chcio", "rsm", "part year", "family practice", "major general",
+                 "sister", "mha", "magistrate", "- see sch o", "see sch o", "sch o", "dc","the very rev", "the most reverend", "the honorable", "the hon",
+                 "general", "vice pres", "fr", "mba", "jd", "ma", "bsn", "cco", "chco", "mpas", "pac", "dsc", "cbs", "chs", "ed d",
+                 "rd", "bsbn", "mshrm", "cpm", "ccim", "ecc", "home care", "st john", "ph d", "csj", "non voting", "ex officio",
+                 "dmd", "ret maj gen", "sc", "pharm d", "int ceo", "msn", "osf", "mother", "rtscra", "dha", "dh", "evpcao", "evpcoo",
+                 "dha", "family medicine", "mshr", "aprn", "cssf", "offcr", "cfo", "chcp", "ccep", "facp", "fhm", "cphq", "op", "cpe", "vd", "dvm",
+                 "cma", "drph", "mhp", "pmhnp", "er", "fsgm", "eid", "dpm", "staff acct", "cfp", "cpfo", "pe", "father", "esquire", "phjc", "dnsc",
+                 "csfn", "dpth", "br", "fsc", "emhs", "rpa", "facsm", "mn", "adm", "scd", "psyd", "jcdjv", "fp", "msc", "bs", "mfa", "csc", "snd",
+                 "pa-c", "nhs", "facs", "vpgeneral couns", "preside", "gen counsel", "pa", "vpcfo", "lmt", "ccvi", "pe", "scc", "rrt", "wvote",
+                 "nea-", "ph", "brother", "senior", "facc", "msf", "rph", "facep", "dml", "employed", "member", "dsw", "-april", "april-dec", "facs",
+                 "inactive", "dmsc", "jul-", "dec-jun", "-jun", "lnha", "hon", "cc", "joined", "mdboard", "mddirector", "nlh", "presceo", "svp",
+                 "lega", "presidentceo", "sp", "of", "fsa", "dmin", "dhsc", "sphr", "csa", "hm", "lcda", "lcdo", "mrs", "ms", "mr", "faap", "sessions",
+                 "corporate compliance", "wm", "cso", "thm", "osp", "mpf", "commissioner", "honorable", "mpd", "ne-", "- care", "ambulatory",
+                 "treasasst", "secr", "administrative", "pd", "mdiv", "msgr", "dba", "msed", "ba", "sectreas", "sectrint", "prsceo", "mdphd", "ihm",
+                 "sen", "facog", "caqsh", "mmm", "fccp", "fc", "msm", "legal", "offi", "fann", "svpcfo", "executive", "dpt", "foo", "network dev", 
+                 "cfoasst", "pc-a", "bds", "cme", "pp", "psy d", "vice", "key employe", "senior", "phcns", "fmm", "presidenceo", "mrcp", "lohr",
+                 "lmhc", "mppm", "lcsw", "rnc-ob", "fabc", "bcps", "dabr", "csjp", "business", "cfe", "chfp", "counselman", "cpcu", "key", "pbvm",
+                 "pres", "directorvp", "chairpers", "cnl", "non-voting", "jul", "vpcfocoo", "financial", "till", "mpa", "gen'l", "counse", "msf",
+                 "exec", "dirintrm", "cgma", "fhfma", "frmr", "reverend", "ed", "acm", "fa", "mlt", "cfa", "umms rep", "chairperson", "voting", 
+                 "annual life", "jrdo", "ssm", "mdpres", "med", "fabf", "ncpsya", "fac", "pr", "llm", "mshcm", "- mar", "crmc", "cno", "mhcds", 
+                 "facr", "senator", "finance", "mso", "rhsj", "mot otrl", "ocn", "lsw", "mmhc", "cfre", "msa", "cws", "dph", "mscprp", "dec-june",
+                 "mdms", "mdret", "dpa", "rdh", "faia", "jwc", "chairman", "msmphrncph", "fmp", "physd", "phdcne", "- dec", "then", "clinical",
+                 "lpd", "-sept", "-may", "june", "incoming", "elect", "macp", "- reg", "- treas", "strategy", "dmv", "membervp", "jr", "feb-dec", "-aug",
+                 "- dec", "cnsl", "empl", "hcomp", "and", "admin", "dec-mar", "rtt", "may-dec", "svpchief", "cic", "mbamsnrn", "msrncnscenp",
+                 "dm", "medical", "evp", "patient", "philanthropy", "clinic", "ahmc", "division", "-care div med th", "-care div fin", "-care div ops",
+                 "-cvn clinics", "-care div", "chse", "dns", "care division", "- nov", "south meadows", "cmo","pmh", "mpp", "ahdl", "-dec", "cpmsm",
+                 "hacp", "coo", "dnpapn", "anp", "pastor", "dnpmsnrn", "mgmt", "secrtreas", "jrv", "vpceo", "scch", "frcp", "ssj", "ncmp", "mscr", "dsf",
+                 "mbr", "mspt", "jrdo", "clin", "coo", "svpchief", "sectreasurer", "and", "msha", "mphd", "apa", "ahp", "ee", "contracted", "phr",
+                 "iii", "facg", "mdterm", "macp", "lcpc", "ccp", "rnc", "msob", "ceosecretary", "wchd", "cfosr", "cfovp", "cphrm", "cpps", "cooasst",
+                 "treasto", "-directorjul-apr", "apr", "fmp", "ops", "scrn", "msnrn", "rnc", "fccm", "mdoff", "informa", "family", "orthopedic", 
+                 "ppcme", "august", "partial", "lmh", "evp ballad health", "past", "tmh", "- aug", "evp", "lmhtrh", "chairperson", "treas", "nov", "dec",
+                 "rtrtc", "dmo", "truste", "presiden", "fach", "fhf", "year", "prn", "execut", "february", "frm", "- mar", "ncr", "fdtn", "ipd", 
+                 "aug", "nov", "feb", "only", "part yr", "care div", "-cur", "- mar", " - care", "- reg", "-c", "- fin", "-directorjul", "-july",
+                 "acns", "mpah", "achce", "judge", "rabbi", "rc", "jrphd", "since", "sept", "ex-officio", "jun", "sep", "aca", "nd", "sec", "co", "stm", "jr", "dd", "ch",
+                 "vg", "faacvpr", "svcs", "ahhm", "care", "see sch", "sch", "inc", "vcos", "jrpa", "ahuv", "yr", "rahn", "syed", "cos", "ehfph", "ehmc", "msph")
+
+# Create name_cleaned variable
 people_data <- people_data %>%
-  mutate(do = ifelse(str_detect(PersonNm, "\\sdo$|\\sdo\\s"),1,0)) %>%
-  mutate(do = ifelse(str_detect(TitleTxt, "\\sdo$|\\sdo\\s"),1,do))
-
-# column for other doctor titles
-people_data <- people_data %>%
-  mutate(other_doctor = ifelse(str_detect(PersonNm, "\\smbbch\\s|\\smbbs$|\\bdc\\b|\\bdds\\b|dentist"),1,0)) %>%
-  mutate(other_doctor = ifelse(str_detect(TitleTxt, "\\smbbch\\s|\\smbbs$|\\bdc\\b|\\bdds\\b|dentist"),1,other_doctor))
-
-# create column for "RN"
-people_data <- people_data %>%
-  mutate(nurse = ifelse(str_detect(PersonNm, "\\srn$|\\sdnp$|\\aprn$|\\bcrna$"),1,0)) %>%
-  mutate(nurse = ifelse(str_detect(TitleTxt, "rn|dnp|aprn|nurse practitioner|fnp|nurse|crna|anp|\\bnp\\b|\\ip\\b|registered n|\\bapn\\b|nursing|\\blpn\\b"),1,nurse))
-
-# create column for "mha"
-people_data <- people_data %>%
-  mutate(mha = ifelse(str_detect(PersonNm, "\\smha$|\\smha\\s"),1,0)) %>%
-  mutate(mha = ifelse(str_detect(TitleTxt, "\\smha$|\\smha\\s"),1,mha))
-
-observe <- people_data %>%
-  filter(str_detect(name_cleaned, "-"))
+  mutate(name_cleaned = PersonNm)
 
 # remove "see schedule o"
 people_data <- people_data %>%
@@ -87,277 +122,230 @@ people_data <- people_data %>%
 
 # Remove punctuation and digits from names
 people_data <- people_data %>%
-  mutate(name_cleaned = str_remove_all(name_cleaned, "[[:punct:]]")) %>%
-  mutate(name_cleaned = str_remove_all(name_cleaned, "[0-9]+"))
-
-# remove common doctor titles and anything that comes after them in the string
-titles <- c("md", "do", "od", "rn", "mbbch", "mbbs", "dnp", "until", "as of", "mha", "eff", "end", "beg", "thru", "through", "osb",
-            "ending", "term", "mph", "deceased", "to", "begin", "left", "see statement", "director", "chair", "hired", "termed",
-            "began", "retired", "from", "resigned", "off", "vp", "ended", "started", "trm", "dir of", "pd by", "pharmd", "provost",
-            "start", "oct", "treasurer", "jan", "st", "chief", "t0", "entered", "interim", "board", "crna", "fmr", "int", "trustee",
-            "vice president", "dir", "bh", "vppres", "msn", "mst", "assoc", "departed", "msw", "ceo", "cbe", "secretary", "rsmterm",
-            "effective", "effec", "former", "admininstrator", "consultant", "cnm", "fellow", "beginning", "president")
-# remove anything that comes after these titles
-people_data <- people_data %>%
-  mutate(name_cleaned = str_remove_all(name_cleaned, paste0("\\b", titles, "\\b", ".*", collapse="|")))
-
-# remove common titles
-titles <- c("dr", "bishop", "esq", "jr", "sr", "md", "phd", "dds", "ii", "iii", "iv", "ms", "mr", "do","most rev", "rev", "rn", "edd", "cpa", "od",
-            "the rt", "dnp", "bc", "faan", "mb", "chb", "mbbh", "mbbch", "chcio", "rsm", "part year", "family practice", "major general",
-            "sister", "mha", "magistrate", "- see sch o", "see sch o", "sch o", "dc","the very rev", "the most reverend", "the honorable", "the hon",
-            "general", "vice pres", "fr", "mba", "jd", "ma", "bsn", "cco", "chco", "mpas", "pac", "dsc", "cbs", "chs", "ed d",
-            "rd", "bsbn", "mshrm", "cpm", "ccim", "ecc", "home care", "st john", "ph d", "csj", "non voting", "ex officio",
-            "dmd", "ret maj gen", "sc", "pharm d", "int ceo", "msn", "osf", "mother", "rtscra", "dha", "dh", "evpcao", "evpcoo",
-            "dha", "family medicine", "mshr", "aprn", "cssf", "offcr", "cfo", "chcp", "ccep")
-people_data <- people_data %>%
-  mutate(name_cleaned = str_remove_all(name_cleaned, paste0("\\b", titles, "\\b", collapse = "|")))
-
-# Trim extra spaces
-people_data <- people_data %>%
+  mutate(name_cleaned = str_remove_all(name_cleaned, "\\.|,|'")) %>%
+  mutate(name_cleaned = str_remove_all(name_cleaned, "[0-9]+")) %>%
   mutate(name_cleaned = str_squish(name_cleaned))
 
-# remove middle initials
-#people_data <- people_data %>%
-#mutate(name_cleaned = str_replace_all(name_cleaned, "\\s[a-z]\\s", "\\s"))
+# create indicator columns
+create_indicator <- function(names_vector, title_list) {
+  pattern <- paste(title_list, collapse = "|")  # Combine into regex pattern
+  as.integer(grepl(pattern, names_vector, ignore.case = TRUE))
+}
 
-# get rid of initials at the beginning of the name
-#people_data <- people_data %>%
-#mutate(name_cleaned = str_remove(name_cleaned, "^[a-z]\\s"))
+people_data$doctor <- create_indicator(people_data$PersonNm, doctor_list)
+people_data$other_doctor <- create_indicator(people_data$PersonNm, other_doctor_list)
+people_data$nurse <- create_indicator(people_data$PersonNm, nurse_list)
+people_data$ha <- create_indicator(people_data$PersonNm, ha_list)
 
-# goal 2: clean up TitleTxt column ####
+# remove anything occuring after the words "paid by" or in parentheses
+people_data <- people_data %>%
+  mutate(name_cleaned = str_remove(name_cleaned, "paid by .+$")) %>%
+  mutate(name_cleaned = str_remove(name_cleaned, "\\(.+\\)"))
 
+# remove any titles or extra from name_cleaned column
+all_remove_list <- c(doctor_list, other_doctor_list, nurse_list, ha_list, remove_list)
+
+people_data <- people_data %>%
+  mutate(name_cleaned = str_remove_all(name_cleaned, paste(all_remove_list, collapse = "\\b|\\b")))
+
+# Remove dashes that happen at the end
+people_data <- people_data %>%
+  mutate(name_cleaned = str_squish(name_cleaned)) %>%
+  mutate(name_cleaned = str_remove(name_cleaned, "-$")) %>%
+  mutate(name_cleaned = str_squish(name_cleaned)) %>%
+  mutate(name_cleaned = str_remove(name_cleaned, "-$")) 
+
+# Remove parentheses
+people_data <- people_data %>%
+  mutate(name_cleaned = str_remove(name_cleaned, "()"))
+
+# Remove "esq" occuring at the end
+people_data <- people_data %>%
+  mutate(name_cleaned = str_remove(name_cleaned, "esq$"))
+
+# remove weird lines
+people_data <- people_data %>%
+  filter(PersonNm!="non compensated trustees")
+
+# # look at observations with a lot of words
+observe <- people_data %>%
+   mutate(name_cleaned = str_remove_all(name_cleaned, "\\b[a-z]\\b")) %>%
+   mutate(name_cleaned = str_squish(name_cleaned)) %>%
+   filter(str_count(name_cleaned, "\\s")>1) %>%
+   distinct(name_cleaned)
+# write.csv(observe, paste0(created_data_path, "observe.csv"))
+
+
+
+# GOAL 2: ASSIGN POSITIONS ####
 # change titles to lower case
 people_data <- people_data %>%
-  select(-PersonNm) %>%
   mutate(TitleTxt = tolower(TitleTxt))
 
-# create data set of unique titles
-unique_titles <- people_data %>%
-  distinct(TitleTxt)
-
-# create column for ex-officio
 people_data <- people_data %>%
-  mutate(ex_officio = ifelse(str_detect(TitleTxt, "ex officio|ex-officio|exofficio|ex-off"),1,0)) %>%
   mutate(TitleTxt = str_remove_all(TitleTxt, "ex officio|ex-officio|exofficio|ex-off"))
 
 # remove rows containing "former"
 people_data <- people_data %>%
-  filter(!(str_detect(TitleTxt, "former|\\bfmr\\b|past|\\bfr\\b")))
+  filter(!(str_detect(TitleTxt, "former|\\bfmr\\b|past|\\bfr\\b|\\bfrmr\\b|fomer|retire")))
 
 # remove punctuation and "and"
 people_data <- people_data %>%
   mutate(TitleTxt = str_remove_all(TitleTxt, "[[:punct:]]")) %>%
   mutate(TitleTxt = str_remove_all(TitleTxt, "and"))
 
+ceo_list <- c("ceo", "chief executive", "hospital pres")
+cfo_list <- c("cfo", "chief fin", "senior finance")
+coo_list <- c("coo", "chief operat")
+cmo_list <- c("cmo", "chief med")
+cno_list <- c("cno", "chief nurs")
+other_chief_list <- c("c[a-su-z]o", "administrator", "chief", "exec", "cheif", "officer", "ofcr")
+pres_list <- c("pres")
+vp_list <- c("vp", "svp", "vice pres")
+board_list <- c("director$", "board", "member", "trustee", "chai", "secretary", "sec", "treasurer", "treas", "trustte", "brd", "diretor", "dir$")
 
-# Create column for CEO
+# Remove anything after "as of"
 people_data <- people_data %>%
-  mutate(ceo = ifelse(str_detect(TitleTxt, "ceo|chief executive officer|hospital pre|hospital president"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "ceo|chief executive officer|hospital pre|hospital president")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
+  mutate(TitleTxt = str_remove(TitleTxt, "as of.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "thru.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "through.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "start.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "end.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "eff.+$")) %>%
+  mutate(TitleTxt = str_remove(TitleTxt, "beginning.+$"))
 
-# create column for cfo
+# Remove all digits
 people_data <- people_data %>%
-  mutate(cfo = ifelse(str_detect(TitleTxt, "cfo|chief financial officer|senior finance"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "cfo|chief financial officer|senior finance")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
+  mutate(TitleTxt = str_remove_all(TitleTxt, "[0-9]+"))
 
-# create column for cqo
-people_data <- people_data %>%
-  mutate(cqo = ifelse(str_detect(TitleTxt, "cqo|chief quality officer"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "cqo|chief quality officer")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
 
-# create column for cmo
-people_data <- people_data %>%
-  mutate(cmo = ifelse(str_detect(TitleTxt, "cmo|chief medical officer|chief medical|chief medica"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "cmo|chief medical officer|chief medical|chief medica")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
+people_data <- people_data %>% 
+  mutate(TitleTxt = str_squish(TitleTxt)) %>%
+  mutate(position = ifelse(str_detect(TitleTxt, paste(ceo_list, collapse="|")), "ceo", NA)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(cfo_list, collapse="|")), "cfo", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(coo_list, collapse="|")), "coo", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(cmo_list, collapse="|")), "cmo", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(cno_list, collapse="|")), "cno", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(other_chief_list, collapse="|")), "other_chief", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(vp_list, collapse="|")), "vp", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(pres_list, collapse="|")), "president", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(TitleTxt, paste(board_list, collapse="|")), "board", position))
 
-# create column for board member
-people_data <- people_data %>%
-  mutate(board_member = ifelse(str_detect(TitleTxt, "board|trustee|director|member|secretary|diretor|treasurer|treas|bd mem|trustte|asst sec|Trtu|\\bmem\\b|\\btr\\b|asec|\\bsec\\b|at large|bd mbr"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "board|trustee|director|member|secretary|diretor|treasurer|treas|bd mem|trustte|asst sec|Trtu|\\bmem\\b|\\btr\\b|asec|\\bsec\\b|at large|bd mbr")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# repeat board member but in the name column
-people_data <- people_data %>%
-  mutate(board_member = ifelse(str_detect(name_cleaned, "board|trustee|director|member|secretary|diretor|treasurer|treas|bd mem|trustte|asst sec|Trtu|\\bmem\\b|\\btr\\b|asec|\\bsec\\b|at large|trea|turstee"),1,board_member)) %>%
-  mutate(name_cleaned = str_remove_all(name_cleaned, "board|trustee|director|member|secretary|diretor|treasurer|treas|bd mem|trustte|asst sec|Trtu|\\bmem\\b|\\btr\\b|asec|\\bsec\\b|at large|trea|turstee"))
-
-# create column for president
-people_data <- people_data %>%
-  mutate(president = ifelse(str_detect(TitleTxt, "president|pres"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "president|pres")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for vice chairman
-people_data <- people_data %>%
-  mutate(vice_chairman = ifelse(str_detect(TitleTxt, "vice c|vice chairman|vice chair|vchm|vice chairperson|vice chr|vice-chairpe|vicechairman|vicechairwoman|vice cha|vicechair|vicechairma|vice c|\\bvc\\b"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "vice c|vice chairman|vice chair|vchm|vice chairperson|vice chr|vice-chairpe|vicechairman|vicechairwoman|vice cha|vicechair|vicechairma|vice c|\\bvc\\b"), TitleTxt) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for chair
-people_data <- people_data %>%
-  mutate(chair = ifelse(str_detect(TitleTxt, "chair|chm|chairperson|cha|chairma|chairwoma|\\bch\\b"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "chair|chm|chairperson|cha|chairma|chairwoma")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for physcian
-# create list of physicians
-physician_titles <- c("physician", "phys", "dr", "doctor", "surgeon", "obsgyn", "obgyn", "orthopedic", "neuro", "radiation onc", "md", "do", "psychiatrist", 
-                      "anesthesiologist", "pathologist", "radiology", "radiologist", "\\bpa\\b", "urology", "urologist", "hospitalist", "emergency medicine", "\\bpt\\b",
-                      "pulmonologist", "gastroenterologist", "podiatrist", "anesthesiaologist", "otolaryngologist", "neonatologist", "intensivist", "nephrology",
-                      "provider", "orthopedist", "anesthetist", "gastroenterology", "radiation", "\\bpac\\b", "perfusionist",
-                      "\\bent\\b", "paramedic", "family pract", "ortho", "surgery", "pharmac", "\\bgyn\\b", "attending", "gastrology",
-                      "\\bapp\\b", "ophthalmolog", "ophthalmology", "pediatrics", "anesthesia", "hematologist", "pulmonary")
-
-people_data <- people_data %>%
-  mutate(physician = ifelse(str_detect(TitleTxt, paste0(physician_titles, collapse = "|")),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, paste0(physician_titles, collapse = "|"))) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for pharmacist
-people_data <- people_data %>%
-  mutate(pharmacist = ifelse(str_detect(TitleTxt, "pharmacist|pharmd|pharmacy"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "pharmacist|pharmd|pharmacy")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for chief operating officer
-people_data <- people_data %>%
-  mutate(coo = ifelse(str_detect(TitleTxt, "chief operating officer|coo|chief operat|chief operating fi"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "chief operating officer|coo|chief operat|chief operating fi")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# chief of specific doctor things
-people_data <- people_data %>%
-  mutate(chief = ifelse(str_detect(TitleTxt, "chief of vascular surgery|chief vascular surgery"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "chief of vascular surgery|chief vascular surgery")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for chief nursing officer
-people_data <- people_data %>%
-  mutate(cno = ifelse(str_detect(TitleTxt, "chief nursing officer|cno|chief nursing ficer|chief nursin"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "chief nursing officer|cno|chief nursing ficer|chief nursin")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# creat column for fache
-people_data <- people_data %>%
-  mutate(fache = ifelse(str_detect(TitleTxt, "fache"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "fache")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create chief staff column
-people_data <- people_data %>%
-  mutate(chief_staff = ifelse(str_detect(TitleTxt, "chief of staff|chief staff"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "chief of staff|chief staff")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# remove random words
-people_data <- people_data %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "\\bman\\b|person|assistant|outgoing|sr|1st|2nd|\\bof\\b")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create "division chief" column
-people_data <- people_data %>%
-  mutate(division_chief = ifelse(str_detect(TitleTxt, "division chief|div chief"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "division chief|div chief")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for vp
-people_data <- people_data %>%
-  mutate(vp = ifelse(str_detect(TitleTxt, "vp|vice president|vppres|hosp ops|evc"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "vp.*|vice president.*|vppres.*|hosp ops|evc")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create committee community column
-people_data <- people_data %>%
-  mutate(committee_community = ifelse(str_detect(TitleTxt, "committee community|committee comm"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "committee community|committee comm")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for dean
-people_data <- people_data %>%
-  mutate(dean = ifelse(str_detect(TitleTxt, "dean|chief academic officer|provost"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "dean|chief academic officer|provost")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# remove single letters
-people_data <- people_data %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "\\b[a-z]\\b")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for administrator
-people_data <- people_data %>%
-  mutate(administrator = ifelse(str_detect(TitleTxt, "administrator|admin|administration|adm|office manag"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "administrator|admin|administration|adm|office manag")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for other chief officer/executive director
-people_data <- people_data %>%
-  mutate(other_chief_officer = ifelse(str_detect(TitleTxt, "chief|officer|c[a-z]{2}|exec|\\bed\\b|senior leader"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "chief|officer|c[a-z]{2}|exec|\\bed\\b|senior leader")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# create column for program director
-people_data <- people_data %>%
-  mutate(program_director = ifelse(str_detect(TitleTxt, "program director|program dir|dir|mgr|supervisor|ager|head|\\bsupe\\b|supv|mgmt|manager|manag"),1,0)) %>%
-  mutate(TitleTxt = str_remove_all(TitleTxt, "program director|program dir|dir|mgr|supervisor|ager|head|\\bsupe\\b|supv|mgmt|manager|manag")) %>%
-  mutate(TitleTxt = str_squish(TitleTxt))
-
-# look at observations where TitleTxt is not empty and position columns are all zero
-# create list of all position columns created
-positions <- c("ceo", "vp", "cfo", "cqo", "cmo", "board_member", "president", "vice_chairman", "chair", "physician", "pharmacist", "coo", "chief", "cno", 
-               "fache", "chief_staff", "division_chief", "nurse", "committee_community", "md", "other_doctor", "do", "mha", "administrator", "other_chief_officer", 
-               "program_director", "ex_officio")
+# look for the important titles in the name column
+people_data <- people_data %>% 
+  mutate(position = ifelse(str_detect(PersonNm, paste(ceo_list, collapse="|")), "ceo", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(cfo_list, collapse="|")), "cfo", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(coo_list, collapse="|")), "coo", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(cmo_list, collapse="|")), "cmo", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(cno_list, collapse="|")), "cno", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(other_chief_list, collapse="|")), "other_chief", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(vp_list, collapse="|")), "vp", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(pres_list, collapse="|")), "president", position)) %>%
+  mutate(position = ifelse(is.na(position) & str_detect(PersonNm, paste(board_list, collapse="|")), "board", position))
 
 observe <- people_data %>%
-  filter(TitleTxt != "" & rowSums(select(., all_of(positions))) == 0)
+  filter(is.na(position)) %>%
+  filter(!(TitleTxt=="physician"))
 
-
-
-# combine positions if there are several rows with the same name, ein, and year
+# Remove anyone that doesn't have a position (these are nurses and physicians left)
 people_data <- people_data %>%
-  group_by(TaxYr, Filer.EIN, name_cleaned) %>%
-  summarise(ceo = max(ceo),
-            vp = max(vp),
-            cfo = max(cfo),
-            cqo = max(cqo),
-            cmo = max(cmo),
-            board_member = max(board_member),
-            president = max(president),
-            vice_chairman = max(vice_chairman),
-            chair = max(chair),
-            physician = max(physician),
-            pharmacist = max(pharmacist),
-            coo = max(coo),
-            chief = max(chief),
-            cno = max(cno),
-            fache = max(fache),
-            chief_staff = max(chief_staff),
-            division_chief = max(division_chief),
-            nurse = max(nurse),
-            committee_community = max(committee_community),
-            md = max(md),
-            other_doctor = max(other_doctor),
-            do = max(do),
-            mha = max(mha),
-            administrator = max(administrator),
-            other_chief_officer = max(other_chief_officer),
-            program_director = max(program_director),
-            ex_officio = max(ex_officio)) %>%
+  filter(!is.na(position))
+
+# take random sample of 100 obs to check
+sample <- people_data %>%
+  sample_n(size=100, replace=FALSE)
+  # looks good!
+
+# create non-voting indicator
+people_data <- people_data %>%
+  mutate(nonvoting = ifelse(str_detect(TitleTxt, "nonvoting|non-voting|nonvting|non-vting|nonvtng|non-vtng"),1,0)) %>%
+  mutate(nonvoting = ifelse(str_detect(PersonNm, "nonvoting|non-voting|nonvting|non-vting|nonvtng|non-vtng"),1,nonvoting))
+
+people_data <- people_data %>%
+  select(-PersonNm, -TitleTxt) %>%
+  distinct()
+# 376k observations
+
+# GOAL 3: GET MALE/FEMALE OF EACH NAME #########
+firstnames <- read_csv(paste0(raw_data_path, "/yob2000.txt"), col_names = FALSE) %>% 
+  filter(X3>50) %>%
+  select(X1) %>%
+  rename(name=X1) %>%
+  mutate(name=tolower(name))
+
+firstnames_list <- as.list(firstnames)[["name"]]
+
+# format names 
+people_data <- people_data %>%
+  mutate(name_cleaned = str_trim(name_cleaned)) %>%
+  mutate(formatted_name = str_remove_all(name_cleaned, "\\b[a-z]\\b")) %>%
+  mutate(formatted_name = str_squish(formatted_name))
+
+# drop people with only one name
+people_data <- people_data %>%
+  filter(str_count(formatted_name, "\\s")>0)
+
+# next, split phrase up into individual words
+people_data <- people_data %>%
+  tidyr::separate_wider_delim(formatted_name, delim=" ", names_sep = ".", too_few = "align_start")
+
+# count up number of times first names occur in the first word of name_cleaned in a firm_year
+people_data <- people_data %>%
+  mutate(first_count = ifelse(formatted_name.1 %in% firstnames_list,1,0)) %>%
+  group_by(TaxYr, Filer.EIN) %>%
+  mutate(total_names = n()) %>%
+  mutate(first_first = sum(first_count)) %>%
   ungroup()
 
 
-# save this version of the data
-saveRDS(people_data, paste0(created_data_path, "/cleaned_people_data2.rds"))
+# If the majority of names have a first name located first, record that as the first name
+people_data <- people_data %>%
+  mutate(first_name = ifelse(first_first/total_names>.5, formatted_name.1, NA))
 
+# if there are only two names and firstname is still missing, fill it with the second name
+people_data <- people_data %>%
+  mutate(first_name = ifelse(is.na(first_name) & is.na(formatted_name.3), formatted_name.2, first_name))
 
+# Now do the same but looking at the third name
+people_data <- people_data %>%
+  mutate(third_count = ifelse(formatted_name.3 %in% firstnames_list,1,0)) %>%
+  mutate(first_name = ifelse(is.na(first_name) & third_count>0, formatted_name.3, first_name))
 
+# Now do the same but looking at the second name
+people_data <- people_data %>%
+  mutate(second_count = ifelse(formatted_name.2 %in% firstnames_list,1,0)) %>%
+  mutate(first_name = ifelse(is.na(first_name) & second_count>0, formatted_name.2, first_name))
 
+# Now do the same but looking at the fourth name
+people_data <- people_data %>%
+  mutate(fourth_count = ifelse(formatted_name.4 %in% firstnames_list,1,0)) %>%
+  mutate(first_name = ifelse(is.na(first_name) & fourth_count>0, formatted_name.4, first_name))
 
+# for the rest (less than 100), just set the first name as first name
+people_data <- people_data %>%
+  mutate(first_name = ifelse(is.na(first_name), formatted_name.1, first_name))
 
+# get rid of unneccesary variables
+people_data <- people_data %>%
+  distinct(TaxYr, Filer.EIN, name_cleaned, first_name, position, doctor, nurse, other_doctor, ha, nonvoting)
 
+# Use "gender" package to predict gender of each name
+genders <- people_data %>%
+  distinct(first_name) %>%
+  rowwise() %>%
+  do(results = gender(.$first_name, years = c(1960,2000), method="ssa")) %>%
+  mutate(n = nrow(results)) %>%
+  filter(n>0) %>%
+  do(bind_rows(.$results)) %>%
+  select(-year_min, -year_max)
+
+# join back to original data
+people_data <- people_data %>%
+  left_join(genders, by=c("first_name"="name"))
+
+# save data
+saveRDS(people_data, paste0(created_data_path, "cleaned_people_data_new.rds"))
+write.csv(people_data, paste0(created_data_path, "cleaned_people_data_new.csv"))
 
 
 

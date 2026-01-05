@@ -305,6 +305,8 @@ hospital_data <- hospital_data %>%
          become_formal_same = ifelse(minyr_sameHRR_formal>min(TaxYr[!is.na(any_partnership_sameHRR)]),1,0),
          never_formal_same = ifelse(minyr_sameHRR_formal==0,1,0)) %>%
   ungroup()
+
+print(mean(hospital_data_closures$dropout_both_ind))
   
 
 # create different data sets based on the control and treatment groups I want to use -------------------------------
