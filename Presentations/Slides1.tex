@@ -655,6 +655,16 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
 %   ^fps       ^prefix         ^first ^last
 \end{frame}
 
+\begin{frame}{HRRs with Connected Hospitals Over Time}
+\centering
+\animategraphics[
+  autoplay,
+  loop,
+  width=0.8\linewidth
+]{2}{Objects/frames_hrr_conn_gif/frame_}{01}{08}
+%   ^fps       ^prefix         ^first ^last
+\end{frame}
+
 % \begin{frame}{Hospital Characteristics}
 % \normalsize
 %     \begin{table}[ht!]
@@ -682,83 +692,7 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
 % \end{table}
 % \end{frame}
 
-% \begin{frame}{Board Overlap Literature Informing Outcomes}
-% Literature has focused mostly on governance
 
-% \vspace{3mm}
-
-% Firm value:
-% \begin{wideitemize}
-%     \item Correlated with higher firm value \small (\cite{baran2017director}) \large and higher profitability \small (\cite{geng2021does}) \large
-% \end{wideitemize}
-
-% \vspace{3mm}
-
-% Firm behavior is mostly looked at as a mechanism:
-% \begin{itemize}
-%     \item More acquisition activity and better performance post-merger \small (\cite{schonlau2009board}) \large
-%     \item Shared IT investments \small (\cite{cheng2021social}) \large
-%     \item reduced R\&D and increased product differentiation \small (\cite{geng2021does})
-% \end{itemize}
-% \end{frame}
-
-% \begin{frame}[t]{Outcomes I Consider}
-
-% % --- Columns to provide a right gutter for braces
-% \begin{columns}[T,onlytextwidth]
-% \begin{column}{0.5\textwidth}
-
-% % --- TikZ marks bracket the groups; they are present from overlay 1
-% \tikzmark{A_top}%
-% \textbf{Consolidation}
-% \begin{itemize}
-%   \item Integration with system
-%   \item Closures
-% \end{itemize}
-
-% \textbf{Financial Outcomes}
-% \begin{itemize}
-%   \item Total operating costs
-%   \item Investments in capital, land, IT
-% \end{itemize}
-% \tikzmark{A_bot}
-
-% \medskip
-
-% \tikzmark{B_top}%
-% \textbf{Product Differentiation}
-% \begin{itemize}
-%   \item Services offered (total and concentration)
-%   \item Patient population (insurer type)
-% \end{itemize}
-% \tikzmark{B_bot}
-
-% \end{column}
-
-% % Right gutter for braces
-% \begin{column}{0.5\textwidth}
-% \end{column}
-% \end{columns}
-
-% % --- Braces and notes appear starting on overlay 2
-% \only<2->{
-% \begin{tikzpicture}[remember picture,overlay]
-%   % Horizontal offset relative to the left text column
-%   \def\xoff{.65\textwidth}
-
-%   % Brace for first two sections
-%   \draw[decorate,decoration={brace,amplitude=5pt},thick]
-%     ($ (pic cs:A_top) + (\xoff, 0.6ex) $) -- ($ (pic cs:A_bot) + (\xoff,-0.6ex) $)
-%     node[midway,xshift=1.5cm,align=left,font=\footnotesize]{\strut geography\\[-1pt] not as relevant};
-
-%   % Brace for last section
-%   \draw[decorate,decoration={brace,amplitude=5pt},thick]
-%     ($ (pic cs:B_top) + (\xoff, 0.6ex) $) -- ($ (pic cs:B_bot) + (\xoff,-0.6ex) $)
-%     node[midway,xshift=1.2cm,align=left,font=\footnotesize]{\strut geography\\[-1pt] relevant};
-% \end{tikzpicture}
-% }
-
-% \end{frame}
 
 
 \section{Leadership Overlap and Consolidation}
@@ -769,15 +703,15 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
     \LARGE Leadership Overlap and Consolidation
 \end{transitionframe}
 
-\begin{frame}{Theory}
-\textcolor{purple}{Overlap and Mergers/Acquisitions:}
+\begin{frame}{Overlap and Mergers/Acquisitions}
+
 \vspace{2mm}
 \begin{columns}[T]
         \column{0.5\textwidth}
         \centering
         \underline{Substitutes}
 
-        \vspace{2mm}
+        \vspace{3mm}
 
         \begin{wideitemize}
         \item If the cost of formal mergers/acquisitions increases, hospitals might substitute towards informal agreements
@@ -787,7 +721,7 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
         \centering
         \underline{Complements}
 
-        \vspace{2mm}
+        \vspace{3mm}
 
         \begin{itemize}
             \item Overlap could lead to consolidation later on because of an established relationship
@@ -795,18 +729,11 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
         \end{itemize}
     \end{columns}
 
-    \vspace{7mm}
-
-    \textcolor{purple}{Overlap and Closing:}
-
-    \vspace{2mm}
-    \begin{itemize}
-        \item Having informal affiliations could boost performance and decrease the likelihood of closing
-    \end{itemize}
+   
 \end{frame}
 
 \begin{frame}{Being Independent as a Function of Gaining/Losing Overlap}
-    Let's first look at what happens when hospitals gain or lose overlap 
+    Let's first look at the correlation of timing with gaining or losing overlap
 
     \vspace{5mm}
 
@@ -825,7 +752,7 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
 \begin{frame}{Being Independent as a Function of Gaining/Losing Overlap}
     \begin{figure}
         \centering
-        \includegraphics[width=0.8\linewidth]{Objects/independent.pdf}
+        \includegraphics[width=0.8\linewidth]{Objects/any_formal_sameHRR.pdf}
     \end{figure}
 \end{frame}
 
