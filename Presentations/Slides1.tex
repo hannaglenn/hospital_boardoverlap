@@ -43,6 +43,8 @@ sorting=ynt,citestyle=authoryear]{biblatex}
 \usepackage{subfigure}
 \usepackage{import}
 \usepackage{fontawesome5}
+\usepackage{subfig}
+\usepackage{subcaption}
 
 \usepackage[backend=biber,style=authoryear,
 sorting=nyt,citestyle=authoryear]{biblatex}
@@ -268,60 +270,6 @@ Evidence from Pay-for-Performance}}
     \end{columns}
 \end{frame}
 
-\begin{frame}[t]{The Big Idea}
-\centering
-
-\vspace{15mm}
-
-\begin{tikzpicture}[
-    node distance=2cm,
-    >=latex,
-    % node styles
-    box/.style = {
-      draw=none,
-      rounded corners=3pt,
-      minimum width=3.7cm,
-      minimum height=1.4cm,
-      align=center,
-      font=\bfseries\large,
-      text=white
-    },
-    circ/.style = {
-      circle,
-      minimum size=2.4cm,
-      align=center,
-      font=\bfseries\large,
-      text=white,
-      draw=none
-    },
-    % arrow styles
-    twoarr/.style = {<->, line width=1.2pt, draw=eggplant},
-    arr/.style = {->, line width=1.2pt, draw=eggplant},
-    underarr/.style= {->, line width=1.2pt, draw=eggplant}
-  ]
-
-  % --- Nodes
-  \node[box, fill=eggplant] (affil) {informal affiliation};
-
-  \node[box, fill=eggplant, right=of affil] (cons) {consolidation};
-
-  \node[circ, fill=eggplant, right=of cons] (comp) {competition\\behavior};
-
-  % --- Arrows
-  \draw[twoarr] (affil) -- (cons);
-  \draw[arr]  (cons) -- (comp);
-    \path
-    (affil.south east) ++(0.1cm,0) coordinate (startBelow);
-  \path
-    (comp.south) ++(0,-1.6cm) coordinate (midBelow); % how far down to dip
-  \draw[underarr]
-    (startBelow)
-      .. controls ($(affil.south)!0.5!(cons.south) + (0,-3cm)$) and (midBelow) ..
-    ($(comp.south) + (0,-0.1cm)$) -- (comp);
-  
-
-\end{tikzpicture}
-\end{frame}
 
 \section{Hospital Consolidation Intro}
 
@@ -384,25 +332,24 @@ Evidence from Pay-for-Performance}}
 \begin{frame}{Hospital Consolidation Literature}
 Operating costs/efficiency
 \begin{itemize}
-    \item Early studies found no effect \small (\cite{alexander1996short}; \cite{ho2000hospital}) \large
-    \item More recent work does document increased efficiency \small (\cite{schmitt2017hospital}; \cite{andreyeva2024corporatization}; \cite{craig2021mergers}) \large
+    \item Early studies found no effect \small \textcolor{lightgray}{(\cite{alexander1996short}; \cite{ho2000hospital})} \large
+    \item More recent work does document increased efficiency \small \textcolor{lightgray}{(\cite{schmitt2017hospital}; \cite{andreyeva2024corporatization}; \cite{craig2021mergers})} \large
 \end{itemize}
 
 \vspace{1mm}
 
 Price/quality
 \begin{itemize}
-    \item Consistently raised prices \small (\cite{gaynor2012impact}; \cite{boozary2019association}; \cite{cooper2019price}; \cite{andreyeva2024corporatization}) \large
-    \item Very mixed evidence on quality \small (\cite{haas2011mergers}; \cite{beaulieu2020changes}; \cite{hayford2012impact}; \cite{andreyeva2024corporatization}) \large
+    \item Consistently raised prices \small \textcolor{lightgray}{(\cite{gaynor2012impact}; \cite{boozary2019association}; \cite{cooper2019price}; \cite{andreyeva2024corporatization})} \large
+    \item Mixed evidence on quality \small \textcolor{lightgray}{(\cite{haas2011mergers}; \cite{beaulieu2020changes}; \cite{hayford2012impact}; \cite{andreyeva2024corporatization})} \large
 \end{itemize}
 
 \vspace{1mm}
 
 Other behaviors/mechanisms
     \begin{itemize}
-        \item Convergence in treatment styles \small (\cite{eliason2020acquisitions}) \large
-        \item Changes in treatment styles \small (\cite{mariani2022impact}) \large
-        \item Shifts in admission patterns \small (\cite{desai2023hospital}) \large
+        \item Convergence/changes in treatment styles \small \textcolor{lightgray}{(\cite{eliason2020acquisitions}; \cite{mariani2022impact})} \large
+        \item Shifts in admission patterns \small \textcolor{lightgray}{(\cite{desai2023hospital})} \large
     \end{itemize}
 
     \vspace{2mm}
@@ -482,7 +429,7 @@ Other behaviors/mechanisms
 
         \begin{wideitemize}
         \item ``Stealth mergers"
-            \item Can reduce competition \\ \small (\cite{majerovitz2021consolidation}; \cite{aggarwal2025stealth}; \cite{wollmann2019stealth}; \cite{wollmann2020get}; \cite{kepler2023stealth}) \large
+            \item Can reduce competition \\ \small \textcolor{lightgray}{(\cite{majerovitz2021consolidation}; \cite{aggarwal2025stealth}; \cite{wollmann2019stealth}; \cite{wollmann2020get}; \cite{kepler2023stealth})} \large
         \end{wideitemize}
 
         \column{0.5\textwidth}
@@ -645,15 +592,15 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
     \end{figure}
 \end{frame}
 
-\begin{frame}{Hospital Connections Over Time}
-\centering
-\animategraphics[
-  autoplay,
-  loop,
-  width=0.8\linewidth
-]{2}{Objects/frames_hosp_conn_gif/frame_}{01}{08}
-%   ^fps       ^prefix         ^first ^last
-\end{frame}
+% \begin{frame}{Hospital Connections Over Time}
+% \centering
+% \animategraphics[
+%   autoplay,
+%   loop,
+%   width=0.8\linewidth
+% ]{2}{Objects/frames_hosp_conn_gif/frame_}{01}{08}
+% %   ^fps       ^prefix         ^first ^last
+% \end{frame}
 
 \begin{frame}{HRRs with Connected Hospitals Over Time}
 \centering
@@ -745,27 +692,80 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
             \item Lose overlap in the same HRR
             \item Lose overlap in a different HRR
         \end{enumerate}
-        \item Outcome is an indicator for whether the hospital is independent (not belonging to a system)
+        \item Outcome is an indicator for whether the hospital is affiliated with a system (exists in HRR and out of HRR)
     \end{wideitemize}
 \end{frame}
 
-\begin{frame}{Being Independent as a Function of Gaining/Losing Overlap}
+\begin{frame}{Joining System in Same HRR as a Function of Gaining/Losing Overlap}
     \begin{figure}
         \centering
-        \includegraphics[width=0.8\linewidth]{Objects/any_formal_sameHRR.pdf}
+        \includegraphics[width=0.75\linewidth]{Objects/any_formal_sameHRR.pdf}
+    \end{figure}
+\end{frame}
+
+\begin{frame}{Joining System in Diff HRR as a Function of Gaining/Losing Overlap}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.75\linewidth]{Objects/any_formal_diffHRR.pdf}
     \end{figure}
 \end{frame}
 
 \begin{frame}{What if Mergers Become More/Less Costly?}
-    \textcolor{red}{need to do this estimation!}
+    This really just tells us there is correlation in the timing of overlap, but not much more
+
+    \vspace{3mm}
+
+    Leveraging how ``aggressive" national merger regulation is as a shock to informal affiliation
+    \begin{wideitemize}
+        \item Since informal affiliations are not nationally regulated, this measure is exogenous to informal affiliations such as overlap
+        \item If mergers become more regulated and informal affiliations go down, we know they are \textcolor{purple}{complements}
+        \item If mergers become more regulated and informal affiliations go up, they are \textcolor{purple}{substitutes}
+    \end{wideitemize}
 \end{frame}
 
-\begin{frame}{Closing as a Function of Gaining/Losing Overlap}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.8\linewidth]{Objects/closure.pdf}
-    \end{figure}
+\begin{frame}{What if Mergers Become More/Less Costly?}
+    \begin{block}{Measure of National ``Aggresiveness" towards Consolidation:}
+    \vspace{2mm}
+        $$MergerCost_t = \frac{\text{Number of Actions}_t}{\text{Number of Proposals}_t}$$
+        \vspace{2mm}
+    \end{block}
+
+    \vspace{8mm}
+
+    $$\text{Overlap}_{ht} = MergerCost_t + \alpha_h + \gamma_{HRR}$$
+    $$\text{Overlap}_{ht} = MergerCost_{t-1} + \alpha_h + \gamma_{HRR}$$
 \end{frame}
+
+\begin{frame}{What if Mergers Become More/Less Costly?}
+    \begin{table}[ht!]
+\centering
+\begin{tabular}[t]{l>{}c>{}cc>{}c}
+\toprule
+ & Same HRR & Diff HRR & Same HRR & Diff HRR\\
+  & Mergers & Mergers & Overlap & Overlap\\
+\midrule
+\addlinespace
+Merger Cost$_t$ & \textcolor[HTML]{2E8B57}{-5.36 (0.48)} & \textcolor[HTML]{2E8B57}{-6.81 (0.57)} & -0.73 (0.58) & \textcolor[HTML]{E69F00}{3.09 (0.9)}\\
+\addlinespace
+Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{2E8B57}{-6.06 (0.57)} & -0.23 (0.59) & \textcolor[HTML]{E69F00}{3.28 (0.91)}\\
+\addlinespace
+\bottomrule
+\end{tabular}
+\end{table}
+
+\vspace{10mm}
+
+\textcolor{purple}{$\implies$ Mergers and overlap have little relationship when considering consolidation in the same HRR, but they seem to be substitutes when considering different HRRs}
+\end{frame}
+
+
+
+% \begin{frame}{Closing as a Function of Gaining/Losing Overlap}
+%     \begin{figure}
+%         \centering
+%         \includegraphics[width=0.8\linewidth]{Objects/closure.pdf}
+%     \end{figure}
+% \end{frame}
 
 \section{Leadership Overlap and Competition}
 
@@ -774,8 +774,132 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
     Leadership Overlap and Competition
 \end{transitionframe}
 
-\begin{frame}{Frame Title}
+\begin{frame}{Outcomes: Informed by Consolidation Literature}
+    Quality
+    \begin{itemize}
+        \item Star Ratings (HCAHPS)
+    \end{itemize}
+
+    \vspace{2mm}
+
+    Financial Behavior
+    \begin{itemize}
+        \item Operating Costs (HCRIS)
+        \item Investment in capital/land/IT (HCRIS)
+    \end{itemize}
+
+    \vspace{2mm}
+
+    Patient Populations
+    \begin{itemize}
+        \item Total discharges (HCRIS)
+        \item Percent Medicare/Medicaid/Private Insurance (HCRIS)
+    \end{itemize}
+
+    \vspace{2mm}
+
+    Product Differentiation
+    \begin{itemize}
+        \item Total services offered (AHA)
+        \item Concentration of services offered (measured by beds devoted to each service: AHA)
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Estimation}
+    Much like merging, gaining or losing affiliation is \underline{not random}
+
+    \vspace{2mm}
+    \begin{itemize}
+        \item So, what can be done?
+        \item I'll limit the control group to those who eventually gain/lose overlap in a \textit{different} HRR
+        \item Based on pre-trends, these groups are similar \textcolor{red}{(link to appendix slide with the graphs of the different groups)}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Estimation}
+    Staggered treatment: gaining or losing overlap in the \underline{same} HRR:
+
+    $$Y_{it} = \alpha + \sum_{k \neq -1} \beta_k \cdot D_{i,t+k} + \gamma_i + \delta_t + \varepsilon_{it}$$
+
+    \vspace{10mm} \pause
+
+    Identifying Assumptions:
+
+    \vspace{2mm}
+    \begin{itemize}
+        \item Parallel trends within the selected sample
+        \item No spillover effects
+        \item No other events correlated with gaining/losing same-HRR overlap
+    \end{itemize}
+\end{frame}
+
+\begin{frame}{Overlap and Quality}
     
+\end{frame}
+
+\begin{frame}{Overlap and Financial Behavior}
+\begin{columns}
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/any_purch.pdf}
+        \caption{Building/Equipment Purchases}
+    \end{figure}
+
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/tot_operating_exp.pdf}
+        \caption{Total Operating Expenses}
+    \end{figure}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Overlap and Patient Population}
+\begin{columns}
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/tot_discharges.pdf}
+        \caption{Total Discharges}
+    \end{figure}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Overlap and Patient Population}
+\begin{columns}
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/perc_mcare.pdf}
+        \caption{Medicare Discharges}
+    \end{figure}
+
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/perc_mcaid.pdf}
+        \caption{Medicaid Discharges}
+    \end{figure}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Overlap and Service Offerings}
+\begin{columns}
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/bed_conc.pdf}
+        \caption{Service Concentration}
+    \end{figure}
+
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/num_services.pdf}
+        \caption{Total Services}
+    \end{figure}
+\end{columns}
 \end{frame}
 
 
