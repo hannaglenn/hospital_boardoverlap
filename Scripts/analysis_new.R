@@ -7,6 +7,7 @@ library(fixest)
 library(ggplot2)
 library(did)
 library(forcats)
+library(ivreg)
 
 # ----------------------------------------------------------------------------------
 #                                     Helper Functions
@@ -262,7 +263,7 @@ outcome_labels <- c("closure"            = "Likelihood of Closure",
 # ----------------------------------------------------------------------------------
 
 # generic filtering
-hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec.rds"))
+hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec_withquality.rds"))
 
 # Filter to either being present in 2015-2020 at least or dropping out of the data
 # this gets rid of hospitals who come in and out of the data due to missing tax records
@@ -306,7 +307,42 @@ hospital_data <- hospital_data %>%
          never_formal_same = ifelse(minyr_sameHRR_formal==0,1,0)) %>%
   ungroup()
 
-print(mean(hospital_data_closures$dropout_both_ind))
+# create variables from the FTC annual reports ------------------------------------------
+hospital_data <- hospital_data %>%
+  mutate(num_reports = case_when(TaxYr==2013 ~ 1326,
+                                 TaxYr==2014 ~ 1663,
+                                 TaxYr==2015 ~ 1801,
+                                 TaxYr==2016 ~ 1832,
+                                 TaxYr==2017 ~ 2052,
+                                 TaxYr==2018 ~ 2111,
+                                 TaxYr==2019 ~ 2089,
+                                 TaxYr==2020 ~ 1637,
+                                 TaxYr==2021 ~ 3520,
+                                 TaxYr==2022 ~ 3152,
+                                 TaxYr==2023 ~ 1805))
+
+hospital_data <- hospital_data %>%
+  mutate(num_actions = case_when(TaxYr==2013 ~ 23,
+                                 TaxYr==2014 ~ 17,
+                                 TaxYr==2015 ~ 22,
+                                 TaxYr==2016 ~ 22,
+                                 TaxYr==2017 ~ 23,
+                                 TaxYr==2018 ~ 22,
+                                 TaxYr==2019 ~ 21,
+                                 TaxYr==2020 ~ 28,
+                                 TaxYr==2021 ~ 18,
+                                 TaxYr==2022 ~ 23,
+                                 TaxYr==2023 ~ 16))
+
+# define IV variables 
+hospital_data <- hospital_data %>%
+  mutate(continuous_iv = num_actions/num_reports,
+         indicator_iv = ifelse(TaxYr %in% c(2013,2014,2015,2016,2021,2022,2023), 1,0)) %>%
+  group_by(Filer.EIN) %>%
+  arrange(TaxYr) %>%
+  mutate(cont_prevyear_iv = lag(continuous_iv)) %>%
+  ungroup()
+
   
 
 # create different data sets based on the control and treatment groups I want to use -------------------------------
@@ -326,10 +362,13 @@ hospital_data_behaviors <- hospital_data %>%
   ungroup() %>%
   filter(minyr_sameHRR_part==0 | maxyr_sameHRR_part - minyr_sameHRR_part>2)  # make sure they stay connected at least 2 years
 
+hospital_data <- hospital_data %>%
+  mutate(system = 1-independent)
+
 # ----------------------------------------------------------------------------------
 #                                 Overlap -> Consolidation
 # ----------------------------------------------------------------------------------
-varlist <- c("any_formal_sameHRR","any_formal_diffHRR", "independent")
+varlist <- c("any_formal_sameHRR","any_formal_diffHRR", "independent", "system")
 
 # Use full hospital data for this estimation
 consolidation_results <- lapply(varlist, function(x){
@@ -386,11 +425,81 @@ closure_results <- lapply(varlist, function(x){
 })
 
 # ----------------------------------------------------------------------------------
+#                                 Overlap -> Mergers (looking at cost of mergers)
+# ----------------------------------------------------------------------------------
+
+# does this IV seem to matter for formal affiliations in my data?
+sys_sameHRR <- as.data.frame(coeftable(feols(any_formal_sameHRR ~ continuous_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+sys_diffHRR <- as.data.frame(coeftable(feols(any_formal_diffHRR ~ continuous_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+  # yes, when the regulations on merging are higher, the likelihood of being formally affiliated goes does in both cases!
+
+# does this IV seem to matter for formal affiliations in my data? (with lagged measure)
+sys_sameHRR_lag <- as.data.frame(coeftable(feols(any_formal_sameHRR ~ cont_prevyear_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+sys_diffHRR_lag <- as.data.frame(coeftable(feols(any_formal_diffHRR ~ cont_prevyear_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+
+# continuous measure of merger cost based on percent of proposals challenged by FTC/DOJ in that year
+overlap_sameHRR <- as.data.frame(coeftable(feols(any_partnership_sameHRR ~ continuous_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+overlap_diffHRR <- as.data.frame(coeftable(feols(any_partnership_diffHRR ~ continuous_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+
+# lagged continuous measure
+overlap_sameHRR_lag <- as.data.frame(coeftable(feols(any_partnership_sameHRR ~ cont_prevyear_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+overlap_diffHRR_lag <- as.data.frame(coeftable(feols(any_partnership_diffHRR ~ cont_prevyear_iv | Filer.EIN + HRRCODE, data=hospital_data))) %>%
+  mutate(Combined = paste0(round(Estimate, 2), " (", round(`Std. Error`,2), ")")) %>%
+  select(Combined)
+
+# separate number of reports and number of challenges (just for robustness)
+feols(any_partnership_sameHRR ~ num_actions + num_reports | Filer.EIN + HRRCODE, data=hospital_data) #substitutes (but small magnitude)
+feols(any_partnership_diffHRR ~ num_actions + num_reports | Filer.EIN + HRRCODE, data=hospital_data) #substitutes (but small magnitude)
+
+
+# create table for paper/presentation
+sys_same <- rbind(sys_sameHRR, sys_sameHRR_lag)
+sys_diff <- rbind(sys_diffHRR, sys_diffHRR_lag)
+over_same <- rbind(overlap_sameHRR, overlap_sameHRR_lag)
+over_diff <- rbind(overlap_diffHRR, overlap_diffHRR_lag)
+
+table_data <- cbind(sys_same, sys_diff, over_same, over_diff) 
+table_data$names <- rownames(table_data) 
+table_data <- data.frame(table_data) %>%
+  mutate(newnames = ifelse(names=="continuous_iv", "Current Merger Regulation", "Lagged Merger Regulation")) %>%
+  select(newnames, Combined, Combined.1, Combined.2, Combined.3)
+
+knitr::kable(table_data, format = "latex",
+             col.names = c("", "Same HRR Mergers", "Diff HRR Mergers", "Same HRR Overlap", "Diff HRR Overlap"),
+             caption = "Merger Regulation and Mergers/Overlap\\label{tab:subs_comp}",
+             row.names = FALSE,
+             table.envir="table",
+             digits=2,
+             booktabs=TRUE,
+             escape=F,
+             align=c("l","c", "c", "c", "c"),
+             position="ht!") %>%
+  kable_styling(full_width=F) %>%
+  column_spec(5, color="#E69F00") %>%
+  column_spec(2:3, color="#2E8B57") %>%
+  write("Objects//subs_comp.tex")
+
+# ----------------------------------------------------------------------------------
 #                                 Overlap -> Behaviors
 # ----------------------------------------------------------------------------------
 varlist <- list("perc_mcaid", "mcaid_discharges", "perc_mcare", "mcare_discharges", "tot_discharges",
                 "bed_conc", "any_purch", "movableequipment_purch", "fixedequipment_purch", "build_purch",
-                "tot_operating_exp", "JNTMD", "FTRNTF", "num_services") 
+                "tot_operating_exp", "JNTMD", "FTRNTF", "num_services", "overall_rating", "summary_rating",
+                "cleanliness", "doc_communication", "care_transition") 
 
 # Use full hospital data for this estimation
 behavior_results <- lapply(varlist, function(x){

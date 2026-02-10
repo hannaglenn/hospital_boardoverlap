@@ -12,6 +12,10 @@ library(kableExtra)
 library(purrr)
 library(ggpubr)
 library(did)
+library(readxl)
+library(usmap)
+library(magick)
+
 
 source("./Scripts/paths.R")
 
@@ -21,6 +25,41 @@ people_data <- readRDS(paste0(created_data_path, "people_connections_boardandexe
 hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec.rds"))
 hospital_connections <- readRDS(paste0(created_data_path, "hospital_connections_boardandexec.rds"))
 AHA <- read_csv(paste0(raw_data_path, "AHAdata_20052023.csv")) 
+
+
+# First make generic graph for presentation showing that hospital concentration has increased over time
+hcris <- read_csv(paste0(raw_data_path, "/final_hcris_data.csv")) 
+
+conc_data <- AHA %>%
+  filter(!is.na(MCRNUM) & !is.na(HSACODE) & SERV==10) 
+conc_data <- conc_data %>% 
+  left_join(hcris, by=c("MCRNUM"="provider_number", "YEAR"="year")) 
+
+# calculate HHI in each health service area 
+conc_data <- conc_data %>%
+  group_by(HRRCODE, YEAR) %>%
+  mutate(hrr_tot_discharges = sum(tot_discharges, na.rm=T)) %>%
+  ungroup() %>%
+  mutate(disch_share = (tot_discharges/hrr_tot_discharges)^2) %>%
+  group_by(HRRCODE, YEAR) %>%
+  mutate(hrr_hhi = sum(disch_share, na.rm=T)) %>%
+  ungroup() %>%
+  distinct(YEAR, HRRCODE, hrr_hhi)
+
+# calculate percent of HRRs with HHI above .18
+conc_data <- conc_data %>%
+  mutate(high_HHI = ifelse(hrr_hhi>=.18,1,0)) %>%
+  group_by(YEAR) %>%
+  mutate(perc_high = mean(high_HHI)) %>%
+  ungroup() %>%
+  distinct(YEAR, perc_high)
+
+ggplot(conc_data, aes(x=YEAR, y=perc_high)) + geom_point() + geom_line() +
+  ylim(0,1) + theme_minimal() +
+  xlab("\nyear") + ylab("Percent\n")
+ggsave(plot=get_last_plot(), filename=paste0(objects_path, "hhi_graph.pdf"),
+       width = 5, height = 4, units="in")
+
 
 # generic filtering
 hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec.rds"))
@@ -281,6 +320,50 @@ combined_plot <-  wrap_plots(plots, ncol = 2) + theme(legend.position = "bottom"
 ggsave("Objects//connected_maps.pdf", width = 6, height = 8, units = "in")
 
 
+# ----- Build frames and GIF -----
+
+# Define the years you want (use your current range or detect from the data)
+years <- intersect(2014:2021, sort(unique(hospital_connections$TaxYr)))
+
+# Output folders and files
+frames_dir <- "./Objects/frames_hosp_conn_gif"
+gif_file   <- "./Objects/hospital_connections_2014_2021.gif"
+dir.create(frames_dir, showWarnings = FALSE, recursive = TRUE)
+
+# Generate and save a PNG per year (ensure consistent aspect and size)
+# 10x6 inches at 200 dpi ≈ 2000x1200 px (crisp for slides)
+walk2(
+  years,
+  seq_along(years),
+  ~{
+    p <- plot_map(hospital_connections, .x)
+    out <- file.path(frames_dir, sprintf("frame_%02d.png", .y))
+    ggsave(
+      filename = out, plot = p,
+      width = 10, height = 6, units = "in", dpi = 200, bg = "white"
+      # Use bg = "transparent" if you prefer transparent background in PPT
+    )
+  }
+)
+
+# Read frames in correct order
+pngs <- list.files(frames_dir, pattern = "\\.png$", full.names = TRUE)
+# Natural sort by embedded numbers
+pngs <- pngs[order(pngs)]
+
+# Optional: hold the last frame for a short pause at the end (e.g., 12 extra frames)
+hold <- 12
+pngs_with_hold <- c(pngs, rep(tail(pngs, 1), hold))
+
+# Build and write the GIF
+img <- image_read(pngs_with_hold)            # read all frames
+anim <- image_animate(img, fps = 2, loop = 0)  # fps controls speed; loop=0 means infinite loop
+image_write(anim, gif_file)
+
+message("GIF written to: ", normalizePath(gif_file))
+
+
+
 # graph: HRRs with connected hospitals within them -------------------------------------------------
 # read in HRR shape file
 hrr_shapes <- sf::st_read(paste0(raw_data_path, "/HRR_Bdry__AK_HI_unmodified/HRR_Bdry__AK_HI_unmodified/hrr-shapefile/Hrr98Bdry_AK_HI_unmodified.shp"))
@@ -320,6 +403,48 @@ combined_plot <- wrap_plots(plots, ncol = 2) + theme(legend.position = "bottom")
   theme(plot.margin = margin(0,0,0,0)) +
   theme(element_text(family = "serif", size=13))
 ggsave("Objects//connected_HRR_maps.pdf", width = 6, height = 6.5, units = "in")
+
+# ----- Build frames and GIF -----
+
+# Define the years you want (use your current range or detect from the data)
+years <- intersect(2014:2021, sort(unique(hospital_connections$TaxYr)))
+
+# Output folders and files
+frames_dir <- "./Objects/frames_hrr_conn_gif"
+gif_file   <- "./Objects/hrr_connections_2014_2021.gif"
+dir.create(frames_dir, showWarnings = FALSE, recursive = TRUE)
+
+# Generate and save a PNG per year (ensure consistent aspect and size)
+# 10x6 inches at 200 dpi ≈ 2000x1200 px (crisp for slides)
+walk2(
+  years,
+  seq_along(years),
+  ~{
+    p <- plot_hrr_map(hospital_connections, .x, hrr_shapes)
+    out <- file.path(frames_dir, sprintf("frame_%02d.png", .y))
+    ggsave(
+      filename = out, plot = p,
+      width = 10, height = 6, units = "in", dpi = 200, bg = "white"
+      # Use bg = "transparent" if you prefer transparent background in PPT
+    )
+  }
+)
+
+# Read frames in correct order
+pngs <- list.files(frames_dir, pattern = "\\.png$", full.names = TRUE)
+# Natural sort by embedded numbers
+pngs <- pngs[order(pngs)]
+
+# Optional: hold the last frame for a short pause at the end (e.g., 12 extra frames)
+hold <- 12
+pngs_with_hold <- c(pngs, rep(tail(pngs, 1), hold))
+
+# Build and write the GIF
+img <- image_read(pngs_with_hold)            # read all frames
+anim <- image_animate(img, fps = 2, loop = 0)  # fps controls speed; loop=0 means infinite loop
+image_write(anim, gif_file)
+
+message("GIF written to: ", normalizePath(gif_file))
 
 
 # table: Summarise hospital pairs-----------------------------------------------------------------------

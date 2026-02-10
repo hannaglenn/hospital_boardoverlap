@@ -551,7 +551,7 @@ hospital_data <- hospital_data %>%
   fill(Filer.ID, .direction="downup") %>%
   ungroup()
 
-# Merge outcome and control variables
+# Merge outcome and control variables ---------------------------------------------------
 AHA_hosp <- AHA %>%
   select(YEAR, ID, SYSID, HRRCODE, LAT, LONG, MAPP5, MCRNUM, SERV,
          ends_with("BD")|ends_with("BD94")|ends_with("BD88"),
@@ -800,6 +800,83 @@ indicators <- hospital_data %>%
 hospital_data <- hospital_data %>%
   left_join(indicators, by = "Filer.EIN")
 
+# join HCAHPS data for measures of quality
+hcahps <- data.frame()
+for (year in 2015:2016){
+  data <- read_csv(paste0(raw_data_path, "Hospital Compare/hcahps_hospital_",year,".csv")) %>%
+    mutate(year=year) %>%
+    select(providerid, hcahpsq, patientsurveystarrating, year)
+  
+  hcahps <- bind_rows(hcahps, data)
+}
+
+for (year in 2017:2018){
+  data <- read_csv(paste0(raw_data_path, "Hospital Compare/hcahps_hospital_",year,".csv")) %>%
+    mutate(year=year) %>%
+    select(provider_id, hcahps_question, patient_survey_star_rating, year) %>%
+    mutate(patient_survey_star_rating = as.character(patient_survey_star_rating)) %>%
+    rename(providerid=provider_id, hcahpsq = hcahps_question, patientsurveystarrating=patient_survey_star_rating)
+  
+  
+  hcahps <- bind_rows(hcahps, data)
+}
+
+for (year in c(2019,2020,2021,2023)){
+  data <- read_csv(paste0(raw_data_path, "Hospital Compare/hcahps_hospital_",year,".csv")) %>%
+    mutate(year=year) %>%
+    select(facility_id, hcahps_question, patient_survey_star_rating, year) %>%
+    mutate(patient_survey_star_rating = as.character(patient_survey_star_rating),
+           facility_id=as.character(facility_id)) %>%
+    rename(providerid=facility_id, hcahpsq = hcahps_question, patientsurveystarrating=patient_survey_star_rating)
+  
+  
+  hcahps <- bind_rows(hcahps, data)
+}
+
+for (year in 2022){
+  data <- read_csv(paste0(raw_data_path, "Hospital Compare/hcahps_hospital_",year,".csv")) %>%
+    mutate(year=year) %>%
+    select(facility_id, hcahpsquestion, patientsurveystarrating, year) %>%
+    mutate(patientsurveystarrating = as.character(patientsurveystarrating),
+           facility_id=as.character(facility_id)) %>%
+    rename(providerid=facility_id, hcahpsq = hcahpsquestion)
+  
+  
+  hcahps <- bind_rows(hcahps, data)
+}
+
+# only keep the relevant questions
+hcahps <- hcahps %>%
+  filter(!(patientsurveystarrating %in% c("Not Applicable", "Not Available"))) %>%
+  mutate(patientsurveystarrating = as.numeric(patientsurveystarrating)) %>%
+  mutate(hcahpsq = str_remove(hcahpsq, " - star rating")) %>%
+  filter(hcahpsq %in% c("Overall hospital rating", "Summary star rating", "Care transition", "Doctor communication", "Cleanliness")) %>%
+  filter(!is.na(providerid))
+
+hcahps <- hcahps %>%
+  distinct()
+
+# look for duplicates
+observe <- hcahps %>%
+  group_by(providerid, year, hcahpsq) %>%
+  mutate(count=1) %>%
+  mutate(sum=sum(count)) %>%
+  ungroup() %>%
+  filter(sum>1)
+
+
+# pivot wider
+hcahps <- pivot_wider(hcahps, id_cols = c(providerid, year), names_from = hcahpsq, names_sep = "_", values_from = patientsurveystarrating)
+
+# join to hospital data 
+hospital_data <- hospital_data %>%
+  left_join(hcahps, by=c("MCRNUM"="providerid", "TaxYr"="year"))
+
+hospital_data <- hospital_data %>%
+  rename(overall_rating = `Overall hospital rating`, summary_rating = `Summary star rating`, care_transition = `Care transition`,
+         doc_communication = `Doctor communication`, cleanliness = Cleanliness)
+
+
 # save hospital data
-saveRDS(hospital_data, file=paste0(created_data_path, "hospital_data_boardandexec.rds"))
+saveRDS(hospital_data, file=paste0(created_data_path, "hospital_data_boardandexec_withquality.rds"))
 
