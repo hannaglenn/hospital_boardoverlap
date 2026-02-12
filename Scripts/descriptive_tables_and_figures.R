@@ -61,9 +61,6 @@ ggsave(plot=get_last_plot(), filename=paste0(objects_path, "hhi_graph.pdf"),
        width = 5, height = 4, units="in")
 
 
-# generic filtering
-hospital_data <- readRDS(paste0(created_data_path, "hospital_data_boardandexec.rds"))
-
 # Filter to either being present in 2014-2021 at least or dropping out of the data
 # this gets rid of hospitals who come in and out of the data due to missing tax records
 hospital_data <- hospital_data %>%
@@ -173,47 +170,47 @@ n_hosp_exec <- format(round(n_hosp_exec$num[[1]],0), big.mark = ",", scientific 
 
 board_people_stats <- people_data %>%
   filter(position=="board") %>%
-  summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
+  summarise_at(c("doctor", "nurse", "female", "partnership_sameHRR", "partnership_diffHRR"), list(mean), na.rm=T) %>%
   mutate(sample = "Board Members",
          n = n_board_people) %>%
-  select(sample, n, doctor, nurse, ha, female)
+  select(sample, n, doctor, nurse, female, partnership_sameHRR, partnership_diffHRR)
 exec_people_stats <- people_data %>%
   filter(position!="board") %>%
-  summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
+  summarise_at(c("doctor", "nurse", "female", "partnership_sameHRR", "partnership_diffHRR"), list(mean), na.rm=T) %>%
   mutate(sample = "Executives",
          n = n_exec_people) %>%
-  select(sample, n, doctor, nurse, ha, female)
+  select(sample, n, doctor, nurse, female, partnership_sameHRR, partnership_diffHRR)
 board_hosp_stats <- people_data %>%
   filter(position=="board") %>%
   group_by(Filer.EIN, TaxYr) %>%
-  summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
+  summarise_at(c("doctor", "nurse", "female", "partnership_sameHRR", "partnership_diffHRR"), list(mean), na.rm=T) %>%
   ungroup() %>%
-  summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
+  summarise_at(c("doctor", "nurse", "female", "partnership_sameHRR", "partnership_diffHRR"), list(mean), na.rm=T) %>%
   mutate(sample = "Hospital Boards",
          n = n_hosp_board) %>%
-  select(sample, n, doctor, nurse, ha, female)
+  select(sample, n, doctor, nurse, female, partnership_sameHRR, partnership_diffHRR)
 exec_hosp_stats <- people_data %>%
   filter(position!="board") %>%
   group_by(Filer.EIN, TaxYr) %>%
-  summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
+  summarise_at(c("doctor", "nurse", "female", "partnership_sameHRR", "partnership_diffHRR"), list(mean), na.rm=T) %>%
   ungroup() %>%
-  summarise_at(c("doctor", "nurse", "ha", "female"), list(mean), na.rm=T) %>%
+  summarise_at(c("doctor", "nurse", "female", "partnership_sameHRR", "partnership_diffHRR"), list(mean), na.rm=T) %>%
   mutate(sample = "Hospital Executive Teams",
          n = n_hosp_exec) %>%
-  select(sample, n, doctor, nurse, ha, female)
+  select(sample, n, doctor, nurse, female, partnership_sameHRR, partnership_diffHRR)
 
 stats <- rbind(board_people_stats, exec_people_stats, board_hosp_stats, exec_hosp_stats)
 
 knitr::kable(stats,
              format = "latex",
-             col.names = c("Sample", "Num. People", "Doctor", "Nurse", "Health Admin.", "Female"),
+             col.names = c("Sample", "Num. People", "Doctor", "Nurse", "Female", "Connected Same HRR", "Connected Different HRR"),
              caption = "Characteristics of Individuals and Hospital Teams\\label{tab:people}",
              row.names = FALSE,
              table.envir="table",
              digits=2,
              booktabs=TRUE,
              escape=F,
-             align=c("l","c","c","c","c", "c", "c"),
+             align=c("l","c","c","c","c", "c", "c", "c"),
              position="ht!",
              linesep = "") %>%
   pack_rows(group_label = "Individuals", start_row = 1, end_row = 2) %>%

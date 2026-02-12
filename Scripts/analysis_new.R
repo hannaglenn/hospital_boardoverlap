@@ -368,7 +368,10 @@ hospital_data <- hospital_data %>%
 # ----------------------------------------------------------------------------------
 #                                 Overlap -> Consolidation
 # ----------------------------------------------------------------------------------
-varlist <- c("any_formal_sameHRR","any_formal_diffHRR", "independent", "system")
+varlist <- c("any_formal_sameHRR","any_formal_diffHRR", "independent", "system", "any_formal")
+
+hospital_data <- hospital_data %>%
+  mutate(any_formal = ifelse(any_formal_diffHRR==1 | any_formal_sameHRR==1,1,0))
 
 # Use full hospital data for this estimation
 consolidation_results <- lapply(varlist, function(x){
