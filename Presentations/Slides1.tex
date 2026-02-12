@@ -252,7 +252,7 @@ Evidence from Pay-for-Performance}}
 
 \large
 
-\begin{frame}{Anti-trust Regulation}
+\begin{frame}{General Increasing Consolidation in Hospital Markets}
     \begin{columns}
         \column{0.5\textwidth}
             \begin{figure}
@@ -273,7 +273,7 @@ Evidence from Pay-for-Performance}}
 
 \section{Hospital Consolidation Intro}
 
-\begin{frame}[t]{What We Already Know (Hospitals)}
+\begin{frame}[t]{What We Already Know}
 \centering
 
 \vspace{15mm}
@@ -466,47 +466,10 @@ Other behaviors/mechanisms
 
 \end{frame}
 
-\section{Overlapping Leaders}
-
-\begin{frame}{Overlapping Leaders: Does it Actually Happen?}
-    \begin{columns}[T]
-        \column{0.4\linewidth}
-        \centering
-        \includegraphics[width=0.9\textwidth]{clips/sevita_news.png}
-
-        \column{0.6\linewidth}
-        \centering
-        \includegraphics[width=0.9\textwidth]{clips/affiliation1.png}
-
-        \vspace{3mm}
-        \includegraphics[width=0.9\textwidth]{clips/affiliation2.png}
-    \end{columns}
-\end{frame}
-
-\begin{frame}{Overlapping Leaders: Should it Actually Matter?}
-    Board of Directors
-
-    \vspace{2mm}
-    \begin{wideitemize}
-        \item Sets the broad direction of the firm and provides oversight
-        \item Not in charge of day-to-day operations
-    \end{wideitemize}
-
-    \vspace{5mm}
-
-    Board Governance is Correlated with Hospital Outcomes
-
-    \vspace{2mm}
-    \begin{wideitemize}
-        \item Level of influence over the CEO \small (\cite{golden2001will}; \cite{alexander2008governance}; \cite{jiang2012enhancing}) \large
-        \item Since the ACA, boards have been more directly involved in quality oversight \small (\cite{jha2010hospital}; \cite{prybil2010board}) \large
-    \end{wideitemize}
-\end{frame}
-
 \begin{frame}[t]{This Paper}
 \centering
 
-\vspace{15mm}
+\vspace{8mm}
 
 \begin{tikzpicture}[
     node distance=2cm,
@@ -529,36 +492,101 @@ Other behaviors/mechanisms
       text=white,
       draw=none
     },
+    note/.style = {
+      draw=none,
+      rounded corners=3pt,
+      minimum width=3.4cm,
+      minimum height=1.1cm,
+      align=center,
+      font=\bfseries\normalsize,
+      text=white,
+      fill=sage
+    },
     % arrow styles
-    twoarr/.style = {<->, line width=2pt, draw=sage},
+    twoarr/.style = {<->, line width=2pt, draw=sage}, % same as <-> but explicit
     arr/.style = {->, line width=1.2pt, draw=eggplant},
     underarr/.style= {->, line width=2pt, draw=sage}
   ]
 
   % --- Nodes
   \node[box, fill=eggplant] (affil) {informal affiliation\\(overlap)};
-
   \node[box, fill=eggplant, right=of affil] (cons) {consolidation};
-
   \node[circ, fill=eggplant, right=of cons] (comp) {competition\\behavior};
 
   % --- Arrows
   \draw[twoarr] (affil) -- (cons);
   \draw[arr]  (cons) -- (comp);
-    \path
-    (affil.south east) ++(0.1cm,0) coordinate (startBelow);
-  \path
-    (comp.south) ++(0,-1.6cm) coordinate (midBelow); % how far down to dip
+
+  % Curved arrow under the nodes
+  \path (affil.south east) ++(0.1cm,0) coordinate (startBelow);
+  \path (comp.south) ++(0,-1.6cm) coordinate (midBelow); % how far down to dip
   \draw[underarr]
     (startBelow)
       .. controls ($(affil.south)!0.5!(cons.south) + (0,-3cm)$) and (midBelow) ..
     ($(comp.south) + (0,-0.1cm)$) -- (comp);
-  
 
+  % --- New "substitutes / complements" box above the middle of the affil<->cons arrow
+  % Midpoint of the arrow between affil and cons
+  \path let \p1 = ($(affil)!0.5!(cons)$) in coordinate (midAffCons) at (\x1,\y1);
+
+  % The new box above that midpoint
+  \node[note, above=1.4cm of midAffCons] (subs) {substitutes\\complements};
+
+  % Arrow from the middle of the affil<->cons arrow up to the box
+  \draw[-, line width=2pt, draw=sage] (midAffCons) -- (subs.south);
 \end{tikzpicture}
 \end{frame}
 
+\section{Overlapping Leaders}
+
+\begin{frame}{Overlapping Leaders: Does it Actually Happen?}
+    \begin{columns}[T]
+        \column{0.4\linewidth}
+        \centering
+        \includegraphics[width=0.9\textwidth]{clips/sevita_news.png}
+
+        \column{0.6\linewidth}
+        \centering
+        \includegraphics[width=0.9\textwidth]{clips/affiliation1.png}
+
+        \vspace{3mm}
+        \includegraphics[width=0.9\textwidth]{clips/affiliation2.png}
+    \end{columns}
+
+    \vspace{5mm} \pause
+
+\begin{itemize}
+    \item Organizations denied merger permission b/c of it \small \textcolor{lightgray}{(\cite{huberfeld2006tackling})}\large, declaring informal affiliations through leadership \small \textcolor{lightgray}{(\cite{barnett_babcock_2012})}\large, and in life sciences companies \small \textcolor{lightgray}{(\cite{manjunath2024illegal})}\large
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Overlapping Leaders: Should it Actually Matter?}
+    Board of Directors
+
+    \vspace{2mm}
+    \begin{wideitemize}
+        \item Sets the broad direction of the firm and provides oversight
+        \item Not in charge of day-to-day operations
+    \end{wideitemize}
+
+    \vspace{5mm}
+
+    Board Governance is Correlated with Hospital Outcomes
+
+    \vspace{2mm}
+    \begin{wideitemize}
+        \item Level of influence over the CEO \small (\cite{golden2001will}; \cite{alexander2008governance}; \cite{jiang2012enhancing}) \large
+        \item Since the ACA, boards have been more directly involved in quality oversight \small (\cite{jha2010hospital}; \cite{prybil2010board}) \large
+    \end{wideitemize}
+\end{frame}
+
 \section{Data}
+
+\begin{transitionframe}
+\centering
+    \LARGE Documenting Leadership Overlap
+\end{transitionframe}
+
 
 \begin{frame}{Data on Boards/Executives}
 \begin{itemize}
@@ -570,13 +598,14 @@ Other behaviors/mechanisms
 
 \begin{table}[ht!]
 \centering
-\begin{tabular}[t]{lccccc}
+\begin{tabular}[t]{lcccccc}
 \toprule
- & Num. People & Doctor & Nurse & Health Admin. & Female\\
+Sample & Num. People & Doctor & Nurse & Female & Connected & Connected\\
+ & & & & & Same HRR & Diff. HRR\\
 \midrule
 \addlinespace[0.3em]
-Board Members & 32,678 & 0.18 & 0.03 & 0 & 0.30\\
-Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
+Board & 32,678 & 0.18 & 0.03 & 0.30 & 0.01 & 0.06\\
+Executive & 19,344 & 0.14 & 0.03 & 0.38 & 0.01 & 0.07\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -679,7 +708,7 @@ Executives & 19,344 & 0.14 & 0.03 & 0 & 0.38\\
    
 \end{frame}
 
-\begin{frame}{Being Independent as a Function of Gaining/Losing Overlap}
+\begin{frame}{Joining a System as a Function of Gaining/Losing Overlap}
     Let's first look at the correlation of timing with gaining or losing overlap
 
     \vspace{5mm}
@@ -834,7 +863,39 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
 \end{frame}
 
 \begin{frame}{Overlap and Quality}
-    
+    \begin{columns}
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/overall_rating.pdf}
+        \caption{Overall Hospital Rating}
+    \end{figure}
+
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/summary_rating.pdf}
+        \caption{Summary of Rating Categories}
+    \end{figure}
+\end{columns}
+\end{frame}
+
+\begin{frame}{Overlap and Quality}
+    \begin{columns}
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/doc_communication.pdf}
+        \caption{Doctor Communication Rating}
+    \end{figure}
+
+    \column{0.5\linewidth}
+    \begin{figure}
+        \centering
+        \includegraphics[width=0.9\linewidth]{Objects/care_transition.pdf}
+        \caption{Care Transition Rating}
+    \end{figure}
+\end{columns}
 \end{frame}
 
 \begin{frame}{Overlap and Financial Behavior}
@@ -900,6 +961,30 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
         \caption{Total Services}
     \end{figure}
 \end{columns}
+\end{frame}
+
+\begin{frame}{Conclusion}
+    \begin{block}{Why do we need this paper?}
+        Hospital consolidation continues to rise, and it's important to know whether to devote resources to regulating even informal affiliations
+    \end{block}
+
+    \vspace{5mm}
+
+    \begin{wideitemize}
+        \item Formal consolidation and leadership overlap are largely unrelated when thinking about relationships within the same HRR
+        \begin{itemize}
+            \item However, they seem to be substitutes when considering relationships outside of the market
+        \end{itemize}
+
+        \item Are within-market informal affiliations anti-competitive?
+        \begin{itemize}
+            \item Quality improves through better care coordination
+            \item More services offered
+            \item No change in patient flows (in aggregate)
+        \end{itemize}
+        
+        
+    \end{wideitemize}
 \end{frame}
 
 
