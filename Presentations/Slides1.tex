@@ -354,7 +354,7 @@ Other behaviors/mechanisms
 
     \vspace{2mm}
 
-\textit{Effects are mitigated with more distance between the hospitals \small  (\cite{cooper2019price}) \large}
+\textit{Effects are mitigated with more distance between the hospitals \small  \textcolor{lightgray}{(\cite{cooper2019price})} \large}
 
 \end{frame}
 
@@ -445,25 +445,66 @@ Other behaviors/mechanisms
     \end{columns}
 \end{frame}
 
-\begin{frame}{Informal Affiliations: A Note of Transparency}
-    In this paper, how I measure informal affiliation is strictly by \underline{overlapping leadership}
+\begin{frame}{Informal Affiliations: Overlapping Leadership}
+    In this paper, I specifically measure \underline{overlapping leadership}
 
-    \vspace{10mm}
+    \vspace{2mm}
+    \begin{wideitemize}
+        \item A board member on the board of two competing hospitals OR
+        \item An executive who sits on the board of a competing hospital
+    \end{wideitemize}
 
-    This is important and relevant on its own
-    \begin{itemize}
-        \item In the Clayton Act
+    \vspace{8mm} 
+
+    Potentially anti-competitive
+
+    \vspace{2mm}
+    \begin{wideitemize}
+        \item Illegal according to the Clayton Act
         \item FTC has targeted it directly
-    \end{itemize}
+    \end{wideitemize}
 
-    \vspace{3mm}
+\end{frame}
 
-    However, could be correlated with other types of affiliation
-    \begin{itemize}
-        \item There is no data to verify this
-        \item I will investigate mechanisms to try to tease it out
-    \end{itemize}
+\begin{frame}{Overlapping Leaders: Does it Actually Happen?}
+    \begin{columns}[T]
+        \column{0.4\linewidth}
+        \centering
+        \includegraphics[width=0.9\textwidth]{clips/sevita_news.png}
 
+        \column{0.6\linewidth}
+        \centering
+        \includegraphics[width=0.9\textwidth]{clips/affiliation1.png}
+
+        \vspace{3mm}
+        \includegraphics[width=0.9\textwidth]{clips/affiliation2.png}
+    \end{columns}
+
+    \vspace{5mm} \pause
+
+\begin{itemize}
+    \item Organizations denied merger permission b/c of it \small \textcolor{lightgray}{(\cite{huberfeld2006tackling})}\large, declaring informal affiliations through leadership \small \textcolor{lightgray}{(\cite{barnett_babcock_2012})}\large, and in life sciences companies \small \textcolor{lightgray}{(\cite{manjunath2024illegal})}\large
+\end{itemize}
+\end{frame}
+
+\begin{frame}{Overlapping Leaders: Should it Actually Matter?}
+    Board of Directors
+
+    \vspace{2mm}
+    \begin{wideitemize}
+        \item Sets the broad direction of the firm and provides oversight
+        \item Not in charge of day-to-day operations
+    \end{wideitemize}
+
+    \vspace{5mm}
+
+    Board Governance is Correlated with Hospital Outcomes
+
+    \vspace{2mm}
+    \begin{wideitemize}
+        \item Level of influence over the CEO \small (\cite{golden2001will}; \cite{alexander2008governance}; \cite{jiang2012enhancing}) \large
+        \item Since the ACA, boards have been more directly involved in quality oversight \small (\cite{jha2010hospital}; \cite{prybil2010board}) \large
+    \end{wideitemize}
 \end{frame}
 
 \begin{frame}[t]{This Paper}
@@ -537,60 +578,19 @@ Other behaviors/mechanisms
 \end{tikzpicture}
 \end{frame}
 
-\section{Overlapping Leaders}
-
-\begin{frame}{Overlapping Leaders: Does it Actually Happen?}
-    \begin{columns}[T]
-        \column{0.4\linewidth}
-        \centering
-        \includegraphics[width=0.9\textwidth]{clips/sevita_news.png}
-
-        \column{0.6\linewidth}
-        \centering
-        \includegraphics[width=0.9\textwidth]{clips/affiliation1.png}
-
-        \vspace{3mm}
-        \includegraphics[width=0.9\textwidth]{clips/affiliation2.png}
-    \end{columns}
-
-    \vspace{5mm} \pause
-
-\begin{itemize}
-    \item Organizations denied merger permission b/c of it \small \textcolor{lightgray}{(\cite{huberfeld2006tackling})}\large, declaring informal affiliations through leadership \small \textcolor{lightgray}{(\cite{barnett_babcock_2012})}\large, and in life sciences companies \small \textcolor{lightgray}{(\cite{manjunath2024illegal})}\large
-\end{itemize}
-\end{frame}
-
-\begin{frame}{Overlapping Leaders: Should it Actually Matter?}
-    Board of Directors
-
-    \vspace{2mm}
-    \begin{wideitemize}
-        \item Sets the broad direction of the firm and provides oversight
-        \item Not in charge of day-to-day operations
-    \end{wideitemize}
-
-    \vspace{5mm}
-
-    Board Governance is Correlated with Hospital Outcomes
-
-    \vspace{2mm}
-    \begin{wideitemize}
-        \item Level of influence over the CEO \small (\cite{golden2001will}; \cite{alexander2008governance}; \cite{jiang2012enhancing}) \large
-        \item Since the ACA, boards have been more directly involved in quality oversight \small (\cite{jha2010hospital}; \cite{prybil2010board}) \large
-    \end{wideitemize}
-\end{frame}
-
 \section{Data}
 
 \begin{transitionframe}
 \centering
-    \LARGE Documenting Leadership Overlap
+    \LARGE Documenting Leadership Overlap\\
+    \vspace{3mm}
+    in U.S. Nonprofit Hospitals
 \end{transitionframe}
 
 
 \begin{frame}{Data on Boards/Executives}
 \begin{itemize}
-    \item Tax Forms 990s: Nonprofits
+    \item Tax Forms 990s: sample of 1,200 nonprofit hospitals
     \item 2013-2023
 \end{itemize}
 
@@ -619,6 +619,7 @@ Executive & 19,344 & 0.14 & 0.03 & 0.38 & 0.01 & 0.07\\
         \caption{Prevalence of Board/Executive Overlap}
         \includegraphics[width=0.8\linewidth]{Objects/connected_percent.pdf}
     \end{figure}
+
 \end{frame}
 
 % \begin{frame}{Hospital Connections Over Time}
@@ -637,7 +638,7 @@ Executive & 19,344 & 0.14 & 0.03 & 0.38 & 0.01 & 0.07\\
   autoplay,
   loop,
   width=0.8\linewidth
-]{2}{Objects/frames_hrr_conn_gif/frame_}{01}{08}
+]{1}{Objects/frames_hrr_conn_gif/frame_}{01}{08}
 %   ^fps       ^prefix         ^first ^last
 \end{frame}
 
@@ -708,43 +709,34 @@ Executive & 19,344 & 0.14 & 0.03 & 0.38 & 0.01 & 0.07\\
    
 \end{frame}
 
-\begin{frame}{Joining a System as a Function of Gaining/Losing Overlap}
-    Let's first look at the correlation of timing with gaining or losing overlap
+% \begin{frame}{Joining a System as a Function of Gaining/Losing Overlap}
+%     Let's first look at the correlation of timing with gaining or losing overlap
 
-    \vspace{5mm}
+%     \vspace{5mm}
 
-    \begin{wideitemize}
-        \item Stacked event study with four types of treatment:
-        \begin{enumerate}
-            \item Gain overlap in the same HRR
-            \item Gain overlap in a different HRR
-            \item Lose overlap in the same HRR
-            \item Lose overlap in a different HRR
-        \end{enumerate}
-        \item Outcome is an indicator for whether the hospital is affiliated with a system (exists in HRR and out of HRR)
-    \end{wideitemize}
-\end{frame}
+%     \begin{wideitemize}
+%         \item Stacked event study with four types of treatment:
+%         \begin{enumerate}
+%             \item Gain overlap in the same HRR
+%             \item Gain overlap in a different HRR
+%             \item Lose overlap in the same HRR
+%             \item Lose overlap in a different HRR
+%         \end{enumerate}
+%         \item Outcome is an indicator for whether the hospital is affiliated with a system (exists in HRR and out of HRR)
+%     \end{wideitemize}
+% \end{frame}
 
-\begin{frame}{Joining System in Same HRR as a Function of Gaining/Losing Overlap}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.75\linewidth]{Objects/any_formal_sameHRR.pdf}
-    \end{figure}
-\end{frame}
+% \begin{frame}{Joining a System as a Function of Gaining/Losing Overlap}
+%     \begin{figure}
+%         \centering
+%         \includegraphics[width=0.75\linewidth]{Objects/system.pdf}
+%     \end{figure}
+% \end{frame}
 
-\begin{frame}{Joining System in Diff HRR as a Function of Gaining/Losing Overlap}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.75\linewidth]{Objects/any_formal_diffHRR.pdf}
-    \end{figure}
-\end{frame}
-
-\begin{frame}{What if Mergers Become More/Less Costly?}
-    This really just tells us there is correlation in the timing of overlap, but not much more
+\begin{frame}{Testing Using the ``Cost" of Merging}
+    Leveraging how ``aggressive" national merger regulation as a shock to informal affiliation
 
     \vspace{3mm}
-
-    Leveraging how ``aggressive" national merger regulation is as a shock to informal affiliation
     \begin{wideitemize}
         \item Since informal affiliations are not nationally regulated, this measure is exogenous to informal affiliations such as overlap
         \item If mergers become more regulated and informal affiliations go down, we know they are \textcolor{purple}{complements}
@@ -761,8 +753,8 @@ Executive & 19,344 & 0.14 & 0.03 & 0.38 & 0.01 & 0.07\\
 
     \vspace{8mm}
 
-    $$\text{Overlap}_{ht} = MergerCost_t + \alpha_h + \gamma_{HRR}$$
-    $$\text{Overlap}_{ht} = MergerCost_{t-1} + \alpha_h + \gamma_{HRR}$$
+    $$\text{Overlap}_{ht} = MergerCost_t + \alpha_h $$
+    $$\text{Overlap}_{ht} = MergerCost_{t-1} + \alpha_h $$
 \end{frame}
 
 \begin{frame}{What if Mergers Become More/Less Costly?}
@@ -784,7 +776,7 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
 
 \vspace{10mm}
 
-\textcolor{purple}{$\implies$ Mergers and overlap have little relationship when considering consolidation in the same HRR, but they seem to be substitutes when considering different HRRs}
+\textcolor{purple}{$\implies$ Mergers and overlap have little relationship when considering overlap in the same HRR, but they seem to be substitutes when different HRRs}
 \end{frame}
 
 
@@ -796,11 +788,11 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
 %     \end{figure}
 % \end{frame}
 
-\section{Leadership Overlap and Competition}
+\section{Leadership Overlap and Hospital Behavior}
 
 \begin{transitionframe}
     \LARGE \centering
-    Leadership Overlap and Competition
+    Leadership Overlap and Hospital Behavior
 \end{transitionframe}
 
 \begin{frame}{Outcomes: Informed by Consolidation Literature}
@@ -835,14 +827,14 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
 \end{frame}
 
 \begin{frame}{Estimation}
-    Much like merging, gaining or losing affiliation is \underline{not random}
+    Much like merging, informal affiliation is \underline{not random}
 
-    \vspace{2mm}
-    \begin{itemize}
-        \item So, what can be done?
-        \item I'll limit the control group to those who eventually gain/lose overlap in a \textit{different} HRR
-        \item Based on pre-trends, these groups are similar \textcolor{red}{(link to appendix slide with the graphs of the different groups)}
-    \end{itemize}
+    \vspace{3mm}
+    \begin{wideitemize}
+        \item Rely on more valid comparison groups
+        \item Treatment: gaining or losing affiliation in the same HRR
+        \item Only compare to not-yet-treated hospitals
+    \end{wideitemize}
 \end{frame}
 
 \begin{frame}{Estimation}
@@ -882,13 +874,6 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
 
 \begin{frame}{Overlap and Quality}
     \begin{columns}
-    \column{0.5\linewidth}
-    \begin{figure}
-        \centering
-        \includegraphics[width=0.9\linewidth]{Objects/doc_communication.pdf}
-        \caption{Doctor Communication Rating}
-    \end{figure}
-
     \column{0.5\linewidth}
     \begin{figure}
         \centering
