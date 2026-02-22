@@ -265,7 +265,7 @@ Evidence from Pay-for-Performance}}
             \begin{wideitemize}
                 \item Hospital markets are becoming increasingly concentrated
                 \item 1,600 mergers from 1998 to 2017 \small (\cite{gaynor2020health}) \large
-                \item This has led to increased scrutiny of mergers and acquisitions
+                \item Now more concern over lack of competition
             \end{wideitemize}
     \end{columns}
 \end{frame}
@@ -276,7 +276,7 @@ Evidence from Pay-for-Performance}}
 \begin{frame}[t]{What We Already Know}
 \centering
 
-\vspace{15mm}
+\vspace{5mm}
 
 \begin{tikzpicture}[
     node distance=2cm,
@@ -298,6 +298,16 @@ Evidence from Pay-for-Performance}}
       font=\bfseries\large,
       text=white,
       draw=none
+    },
+    note/.style = {
+      draw=none,
+      rounded corners=3pt,
+      minimum width=3.4cm,
+      minimum height=1.1cm,
+      align=center,
+      font=\bfseries\small,
+      text=white,
+      fill=eggplant
     },
     % arrow styles
     twoarr/.style = {<->, line width=1.2pt, draw=lightgray},
@@ -323,40 +333,50 @@ Evidence from Pay-for-Performance}}
     (startBelow)
       .. controls ($(affil.south)!0.5!(cons.south) + (0,-3cm)$) and (midBelow) ..
     ($(comp.south) + (0,-0.1cm)$) -- (comp);
+
+      % --- New literature box above the middle of the cons<->comp arrow
+  % Midpoint of the arrow between affil and cons
+  \path let \p1 = ($(cons)!0.5!(comp)$) in coordinate (midAffCons) at (\x1,\y1);
+
+  % The new box above that midpoint
+  \node[note, above=1.4cm of midAffCons] (lit) {efficiency $\uparrow$\\price $\uparrow$\\ quality ?};
+
+  % Arrow from the middle of the affil<->cons arrow up to the box
+  \draw[-, line width=1.2pt, draw=eggplant] (midAffCons) -- (lit.south);
   
 
 \end{tikzpicture}
 \end{frame}
 
 
-\begin{frame}{Hospital Consolidation Literature}
-Operating costs/efficiency
-\begin{itemize}
-    \item Early studies found no effect \small \textcolor{lightgray}{(\cite{alexander1996short}; \cite{ho2000hospital})} \large
-    \item More recent work does document increased efficiency \small \textcolor{lightgray}{(\cite{schmitt2017hospital}; \cite{andreyeva2024corporatization}; \cite{craig2021mergers})} \large
-\end{itemize}
+% \begin{frame}{Hospital Consolidation Literature}
+% Operating costs/efficiency
+% \begin{itemize}
+%     \item Early studies found no effect \small \textcolor{lightgray}{(\cite{alexander1996short}; \cite{ho2000hospital})} \large
+%     \item More recent work does document increased efficiency \small \textcolor{lightgray}{(\cite{schmitt2017hospital}; \cite{andreyeva2024corporatization}; \cite{craig2021mergers})} \large
+% \end{itemize}
 
-\vspace{1mm}
+% \vspace{1mm}
 
-Price/quality
-\begin{itemize}
-    \item Consistently raised prices \small \textcolor{lightgray}{(\cite{gaynor2012impact}; \cite{boozary2019association}; \cite{cooper2019price}; \cite{andreyeva2024corporatization})} \large
-    \item Mixed evidence on quality \small \textcolor{lightgray}{(\cite{haas2011mergers}; \cite{beaulieu2020changes}; \cite{hayford2012impact}; \cite{andreyeva2024corporatization})} \large
-\end{itemize}
+% Price/quality
+% \begin{itemize}
+%     \item Consistently raised prices \small \textcolor{lightgray}{(\cite{gaynor2012impact}; \cite{boozary2019association}; \cite{cooper2019price}; \cite{andreyeva2024corporatization})} \large
+%     \item Mixed evidence on quality \small \textcolor{lightgray}{(\cite{haas2011mergers}; \cite{beaulieu2020changes}; \cite{hayford2012impact}; \cite{andreyeva2024corporatization})} \large
+% \end{itemize}
 
-\vspace{1mm}
+% \vspace{1mm}
 
-Other behaviors/mechanisms
-    \begin{itemize}
-        \item Convergence/changes in treatment styles \small \textcolor{lightgray}{(\cite{eliason2020acquisitions}; \cite{mariani2022impact})} \large
-        \item Shifts in admission patterns \small \textcolor{lightgray}{(\cite{desai2023hospital})} \large
-    \end{itemize}
+% Other behaviors/mechanisms
+%     \begin{itemize}
+%         \item Convergence/changes in treatment styles \small \textcolor{lightgray}{(\cite{eliason2020acquisitions}; \cite{mariani2022impact})} \large
+%         \item Shifts in admission patterns \small \textcolor{lightgray}{(\cite{desai2023hospital})} \large
+%     \end{itemize}
 
-    \vspace{2mm}
+%     \vspace{2mm}
 
-\textit{Effects are mitigated with more distance between the hospitals \small  \textcolor{lightgray}{(\cite{cooper2019price})} \large}
+% \textit{Effects are mitigated with more distance between the hospitals \small  \textcolor{lightgray}{(\cite{cooper2019price})} \large}
 
-\end{frame}
+% \end{frame}
 
 \section{Informal Affiliation Intro}
 
@@ -415,10 +435,10 @@ Other behaviors/mechanisms
 \end{tikzpicture}
 \end{frame}
 
-\begin{frame}{Unregulated Consolidation}
-    While they don't commonly garner national attention, there are other hospital affiliations that could be important
+\begin{frame}{Less Regulated Consolidation}
+    Don't often cause national attention, but could be anti-competitive:
 
-    \vspace{10mm}
+    \vspace{7mm}
 
     \begin{columns}[T]
         \column{0.5\textwidth}
@@ -429,7 +449,7 @@ Other behaviors/mechanisms
 
         \begin{wideitemize}
         \item ``Stealth mergers"
-            \item Can reduce competition \\ \small \textcolor{lightgray}{(\cite{majerovitz2021consolidation}; \cite{aggarwal2025stealth}; \cite{wollmann2019stealth}; \cite{wollmann2020get}; \cite{kepler2023stealth})} \large
+            \item Shown to reduce competition \\ \small \textcolor{lightgray}{(\cite{majerovitz2021consolidation}; \cite{aggarwal2025stealth}; \cite{wollmann2019stealth}; \cite{wollmann2020get}; \cite{kepler2023stealth})} \large
         \end{wideitemize}
 
         \column{0.5\textwidth}
@@ -439,8 +459,8 @@ Other behaviors/mechanisms
         \vspace{3mm}
 
         \begin{wideitemize}
-            \item Joint ventures; Clinical agreements; Shared members of leadership
-            \item Several states have begun regulation these types of affiliations
+            \item Joint ventures; Clinical agreements; \textit{Shared members of leadership}
+            \item Recent increased state regulation
         \end{wideitemize}
     \end{columns}
 \end{frame}
@@ -487,25 +507,25 @@ Other behaviors/mechanisms
 \end{itemize}
 \end{frame}
 
-\begin{frame}{Overlapping Leaders: Should it Actually Matter?}
-    Board of Directors
+% \begin{frame}{Overlapping Leaders: Should it Actually Matter?}
+%     Board of Directors
 
-    \vspace{2mm}
-    \begin{wideitemize}
-        \item Sets the broad direction of the firm and provides oversight
-        \item Not in charge of day-to-day operations
-    \end{wideitemize}
+%     \vspace{2mm}
+%     \begin{wideitemize}
+%         \item Sets the broad direction of the firm and provides oversight
+%         \item Not in charge of day-to-day operations
+%     \end{wideitemize}
 
-    \vspace{5mm}
+%     \vspace{5mm}
 
-    Board Governance is Correlated with Hospital Outcomes
+%     Board Governance is Correlated with Hospital Outcomes
 
-    \vspace{2mm}
-    \begin{wideitemize}
-        \item Level of influence over the CEO \small (\cite{golden2001will}; \cite{alexander2008governance}; \cite{jiang2012enhancing}) \large
-        \item Since the ACA, boards have been more directly involved in quality oversight \small (\cite{jha2010hospital}; \cite{prybil2010board}) \large
-    \end{wideitemize}
-\end{frame}
+%     \vspace{2mm}
+%     \begin{wideitemize}
+%         \item Level of influence over the CEO \small (\cite{golden2001will}; \cite{alexander2008governance}; \cite{jiang2012enhancing}) \large
+%         \item Since the ACA, boards have been more directly involved in quality oversight \small (\cite{jha2010hospital}; \cite{prybil2010board}) \large
+%     \end{wideitemize}
+% \end{frame}
 
 \begin{frame}[t]{This Paper}
 \centering
@@ -571,7 +591,7 @@ Other behaviors/mechanisms
   \path let \p1 = ($(affil)!0.5!(cons)$) in coordinate (midAffCons) at (\x1,\y1);
 
   % The new box above that midpoint
-  \node[note, above=1.4cm of midAffCons] (subs) {substitutes\\complements};
+  \node[note, above=1.4cm of midAffCons] (subs) {substitutes?\\complements?};
 
   % Arrow from the middle of the affil<->cons arrow up to the box
   \draw[-, line width=2pt, draw=sage] (midAffCons) -- (subs.south);
@@ -837,8 +857,8 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \end{wideitemize}
 \end{frame}
 
-\begin{frame}{Estimation}
-    Staggered treatment: gaining or losing overlap in the \underline{same} HRR:
+\begin{frame}{Estimation: Stacked DiD}
+    Staggered treatment: gaining or losing overlap in the \underline{same market}:
 
     $$Y_{it} = \alpha + \sum_{k \neq -1} \beta_k \cdot D_{i,t+k} + \gamma_i + \delta_t + \varepsilon_{it}$$
 
@@ -859,14 +879,14 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/overall_rating.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/overall_rating_gainonly.pdf}
         \caption{Overall Hospital Rating}
     \end{figure}
 
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/summary_rating.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/summary_rating_gainonly.pdf}
         \caption{Summary of Rating Categories}
     \end{figure}
 \end{columns}
@@ -877,7 +897,7 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/care_transition.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/care_transition_gainonly.pdf}
         \caption{Care Transition Rating}
     \end{figure}
 \end{columns}
@@ -888,14 +908,14 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/any_purch.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/any_purch_gainonly.pdf}
         \caption{Building/Equipment Purchases}
     \end{figure}
 
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/tot_operating_exp.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/tot_operating_exp_gainonly.pdf}
         \caption{Total Operating Expenses}
     \end{figure}
 \end{columns}
@@ -906,7 +926,7 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/tot_discharges.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/tot_discharges_gainonly.pdf}
         \caption{Total Discharges}
     \end{figure}
 \end{columns}
@@ -917,14 +937,14 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/perc_mcare.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/perc_mcare_gainonly.pdf}
         \caption{Medicare Discharges}
     \end{figure}
 
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/perc_mcaid.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/perc_mcaid_gainonly.pdf}
         \caption{Medicaid Discharges}
     \end{figure}
 \end{columns}
@@ -935,14 +955,14 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/bed_conc.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/bed_conc_gainonly.pdf}
         \caption{Service Concentration}
     \end{figure}
 
     \column{0.5\linewidth}
     \begin{figure}
         \centering
-        \includegraphics[width=0.9\linewidth]{Objects/num_services.pdf}
+        \includegraphics[width=0.9\linewidth]{Objects/num_services_gainonly.pdf}
         \caption{Total Services}
     \end{figure}
 \end{columns}
