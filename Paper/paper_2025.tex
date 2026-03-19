@@ -200,21 +200,23 @@ sorting=nyt,citestyle=authoryear]{biblatex}
 
     % The hospital consolidation literature highlights both price and quality of care as key factors in the industry. Mergers often grant hospitals greater market power, enabling them to negotiate higher prices with insurance companies. It is unclear whether shared leaders would lead to similar price increases. If overlap facilitates information sharing about negotiations, it could indirectly influence pricing. However, direct board involvement in pricing decisions seems less likely. As price negotiations are unobservable with the data used in this project, I do not focus on this as a likely outcome. However, quality of care is observable and there are direct actions related to overlap that could lead to changes in quality, such as convergence in treatment styles or investment in technology. There is also an indirect path through which overlapping leaders might impact quality, which is that hospitals might compete for the same pool of experienced board members. If the board members with the most expertise are in high demand, sharing that expertise among multiple hospitals could facilitate greater improvements in quality.  [ADD SENTENCE ABOUT SPECIFIC OUTCOMES I USE]
 
-    In the literature on board interlock, several hospital behaviors are shown to be associated with established firm affiliation: mergers, investments in technology and capital, and product differentiation. Thus, I expand these ideas to the hospital industry. First, I measure hospital consolidation choices using indicators for whether the hospital closes or becomes part of a system. A hospital is considered "closed" if they drop out of the tax data, the AHA Survey, and the HCRIS data at the same time and remain missing for the rest of the sample.\footnote{I drop any hospitals that lose connectedness due to closing.} I use the AHA Survey system identifiers to determine whether a hospital becomes part of a system. Second, I measure changes in investment using several variables from the HCRIS financial data: total operating expenses, capital  purchases (movable equipment, fixed equipment, and building purchases), and health information technology purchases. Finally, previous research has shown that sharing information among competing firms can lead to more specialization. In hospitals, there are two distinct types of differentiation: either through services offered, or the types of patients admitted. Both of these behaviors are key findings in the hospital merger literature, indicating that affiliations through leadership could also facilitate changes in these areas. I measure changes in services offered using questions in the AHA Survey capturing whether specific services are offered in the facility, and how many beds are devoted to each service. I create a variable capturing the total number of services offered. I also define a measure of bed concentration using a standard Herfindahl-Hirschman Index, which captures if a hospital becomes more specialized in the services they offer. This is calculated by summing the squared share of beds in each service $k$:  
+    In the literature on board interlock, several hospital behaviors are shown to be associated with established firm affiliation: mergers, investments in technology and capital, and product differentiation. Thus, I expand these ideas to the hospital industry. First, I measure hospital consolidation choices using an indicator for whether the hospital belongs to a system, capturing both mergers and acquisitions. Second, I measure changes in investment using several variables from the HCRIS financial data: total operating expenses, capital  purchases (movable equipment, fixed equipment, and building purchases), and health information technology purchases. Finally, previous research has shown that sharing information among competing firms can lead to more specialization. In hospitals, there are two distinct types of differentiation: either through services offered, or the types of patients admitted. Both of these behaviors are key findings in the hospital merger literature, indicating that affiliations through leadership could also facilitate changes in these areas. I measure changes in services offered using questions in the AHA Survey capturing whether specific services are offered in the facility, and how many beds are devoted to each service. I create a variable capturing the total number of services offered. I also define a measure of bed concentration using a standard Herfindahl-Hirschman Index, which captures if a hospital becomes more specialized in the services they offer. This is calculated by summing the squared share of beds in each service $k$:  
 
-        $$\text{bed concentration} = \sum_{k}\left(\frac{\text{beds}_k}{\text{total beds}}\right)^2.$$
+        $$\text{bed concentration}_h = \sum_{k}\left(\frac{\text{beds}_{hk}}{\text{total beds}_h}\right)^2.$$
+
+    Together, these outcomes capture a range of strategic behaviors that hospitals may pursue when connected through shared leadership. If leadership overlap facilitates the flow of information across hospitals, we would expect to see changes along these dimensions — either through coordinated behavior among connected hospitals or through the adoption of practices observed at affiliated institutions. 
 
     
-    Similarly to mergers and acquisitions, hospital decisions to become connected to another hospital by sharing board members or executives are endogenous. Thus, when thinking about how overlap affects the hospital behaviors discussed above, the relevant comparison group is important. Thus, I present trends over time for a select number of outcomes for four different groups of hospitals: (1) those that gain overlap in the same HRR, (2) those that gain overlap in a different HRR, (3) those that are always connected in a different HRR, and (4) those that are never connected. I show these trends for specific key outcomes in Figure \ref{fig:outcome_desc_graph}. 
+  %   Similarly to mergers and acquisitions, hospital decisions to become connected to another hospital by sharing board members or executives are endogenous. Thus, when thinking about how overlap affects the hospital behaviors discussed above, the relevant comparison group is important. Thus, I present trends over time for a select number of outcomes for four different groups of hospitals: (1) those that gain overlap in the same HRR, (2) those that gain overlap in a different HRR, (3) those that are always connected in a different HRR, and (4) those that are never connected. I show these trends for specific key outcomes in Figure \ref{fig:outcome_desc_graph}. 
 
-    \begin{figure}[ht!]
-        \centering
-        \caption{Select Outcomes by Overlap Status}
-        \includegraphics[width=.8\textwidth]{Objects/outcome_desc_graph.pdf}
-        \label{fig:outcome_desc_graph}
-    \end{figure}
+  %   \begin{figure}[ht!]
+  %       \centering
+  %       \caption{Select Outcomes by Overlap Status}
+  %       \includegraphics[width=.8\textwidth]{Objects/outcome_desc_graph.pdf}
+  %       \label{fig:outcome_desc_graph}
+  %   \end{figure}
 
-  These trends show that not all hospitals serve as a suitable comparison group for those that gain a connection within the same HRR. In the top panel, which plots the average number of services over time, hospitals that remain unconnected or always connected in a different HRR follow a different trajectory than hospitals that become connected. A similar pattern appears for discharges: hospitals that gain overlap track a comparable path before the connection, then diverge, while hospitals that never gain overlap exhibit a distinct trend of declining Medicare and Medicaid discharges. Finally, total operating expenses reveal entirely different slopes for hospitals that never gain overlap compared to those that do, whether in the same or a different market. For this reason, when estimating the effect of gaining overlap in the same market, I compare these hospitals only to those that become connected in a different market. This approach allows me to isolate the effect of connecting with a competitor from the broader effect of becoming connected.
+  % These trends show that not all hospitals serve as a suitable comparison group for those that gain a connection within the same HRR. In the top panel, which plots the average number of services over time, hospitals that remain unconnected or always connected in a different HRR follow a different trajectory than hospitals that become connected. A similar pattern appears for discharges: hospitals that gain overlap track a comparable path before the connection, then diverge, while hospitals that never gain overlap exhibit a distinct trend of declining Medicare and Medicaid discharges. Finally, total operating expenses reveal entirely different slopes for hospitals that never gain overlap compared to those that do, whether in the same or a different market. For this reason, when estimating the effect of gaining overlap in the same market, I compare these hospitals only to those that become connected in a different market. This approach allows me to isolate the effect of connecting with a competitor from the broader effect of becoming connected.
     
 
 
@@ -222,35 +224,68 @@ sorting=nyt,citestyle=authoryear]{biblatex}
 
     \subsection{Mergers/Acquisitions}
 
-     The underlying nature of overlapping leadership with regards to other types of hospital affiliations is an open empirical question. Theoretically, informal affiliations could act as either a substitute for formal mergers or a complement to formal mergers. If they are substitutes, hospitals leverage informal affiliation to achieve some benefits of consolidation, such as strategic alignment, resource coordination, and cost efficiencies, without incurring the regulatory scrutiny and transaction costs associated with a merger. Alternatively, informal affiliations may complement formal mergers either by establishing a relationship that eventually leads to a merger, or by occurring as a result of intentions to merge in the future.
+     Theoretically, informal affiliations could act as either a substitute for formal mergers or a complement to formal mergers. If they are substitutes, hospitals leverage informal affiliation to achieve some benefits of consolidation, such as strategic alignment, resource coordination, and cost efficiencies, without incurring the regulatory scrutiny and transaction costs associated with a merger. Alternatively, informal affiliations may complement formal mergers either by establishing a relationship that eventually leads to a merger, or by occurring as a result of intentions to merge in the future.
 
-    I first investigate the correlation between the timing of gaining or losing leadership overlap and formally integrating with a system using the following stacked event study specification: 
+    I start by simply investigating the correlation between the timing of gaining or losing leadership overlap and formally integrating with a system using the following stacked event study specification: 
     
     \begin{equation}\label{eq:consolidation}
     Y_{it} = \alpha + \sum_{k \neq -1} \beta_k \cdot D_{i,t+k} + \gamma_i + \delta_t + \varepsilon_{it},
     \end{equation}
 
-    where $Y_{it}$ captures system integration, separated by whether the system has presence within the same market or only in different markets. $D_{i,t+k}$ marks event time $k$ relative to the year of gaining or losing overlap (same HRR or different HRR), and $\gamma_i$ and $\delta_t$ are hospital and year fixed effects. I estimate separate sets of $\beta_k$ for same-HRR and different-HRR overlap events. These estimates should not be taken as the causal effect of overlap events on system integration; they are simply an insight into the timing of such events. 
+    where $Y_{it}$ captures system integration, separated by whether the system has presence within the same market or only in different markets. $D_{i,t+k}$ marks event time $k$ relative to the year of gaining or losing overlap (same HRR or different HRR), and $\gamma_i$ and $\delta_t$ are hospital and year fixed effects. I estimate separate sets of $\beta_k$ for same-HRR and different-HRR overlap events. These estimates should not be taken as the causal effect of overlap events on system integration, they are meant to provide suggestive evidence that there is a relationship. 
 
-    Figure \ref{fig:any_formal_sameHRR} presents these estimates when the outcome is limited to system integration within the same HRR market. The left panel uses overlap events that occur with hospitals in the same market, while the right panel leverages overlap events with hospitals in different markets. Losing overlap with a hospital in the same HRR is associated with higher likelihood of entering a system in the same HRR. This is partly mechanical, but provides insight that overlap could pre-date mergers in the same HRR. Similarly, Figure \ref{fig:any_formal_diffHRR} shows the correlation between overlap events and system integration in a different HRR. When hospitals lose overlap with a hospital located in a different HRR, they are also less likely to integrate with a system in a different HRR. Similar patterns are shown in the other overlap events, though not statistically significant. Overall, these graphs point to mergers and overlap acting together, where overlap events coincide with changes in the probability of integrating into a system. 
+Figure \ref{fig:system} presents estimates when the outcome is an indicator for whether a hospital belongs to a system, capturing both same- and cross-market consolidation. The left panel uses overlap events that occur with hospitals in the same HRR, while the right panel leverages overlap events with hospitals in different HRRs. In the left panel, neither gaining nor losing overlap with a hospital in the same HRR is associated with a statistically significant change in the likelihood of system membership, as the confidence intervals comfortably span zero throughout the post-period. In the right panel, however, losing overlap with a hospital in a different HRR is associated with a modest positive trend in system membership following the overlap event, though estimates remain imprecise. Hospitals that gain overlap with a different-HRR hospital show no meaningful change in consolidation behavior. Importantly, pre-trends are flat across all four series, supporting the parallel trends assumption. Overall, these results suggest that leadership overlap with out-of-market hospitals may serve as a partial substitute for formal system integration, consistent with the hypothesis that cross-market informal affiliations reduce the need to consolidate.
 
-    \begin{figure}
-        \centering
-        \caption{Overlap and System Affiliation in the Same HRR}
-        \includegraphics[width=0.8\linewidth]{Objects/any_formal_sameHRR.pdf}
-        \label{fig:any_formal_sameHRR}
-    \end{figure}
 
     \begin{figure}
         \centering
-        \caption{Overlap and System Affiliation in Different HRR}
-        \includegraphics[width=0.8\linewidth]{Objects/any_formal_diffHRR.pdf}
-        \label{fig:any_formal_diffHRR}
+        \caption{Overlap and Likelihood of Being in System}
+        \includegraphics[width=0.8\linewidth]{Objects/system.pdf}
+        \label{fig:system}
     \end{figure}
 
-    This estimation provides some insight into whether there is correlation in the timing of these events, but gives little insight into the true nature of how overlap and mergers are related. Thus, I leverage changes in the ``price" of merging, and see how this affects informal affiliation. Formal mergers and acquisitions are nationally regulated, and the extent to which they are regulated depends on characteristics of the national government such as political party in office. However, informal affiliations are not nationally regulated, and thus not directly affected by changes in merger regulation ``aggressiveness". If the two are complements, more aggressive regulation on mergers should lead to less informal affiliations as well. If the two are substitutes, more aggressive regulations on mergers should lead to increases in informal affiliations. 
+    % \begin{figure}
+    %     \centering
+    %     \caption{Overlap and System Affiliation in the Same HRR}
+    %     \includegraphics[width=0.8\linewidth]{Objects/any_formal_sameHRR.pdf}
+    %     \label{fig:any_formal_sameHRR}
+    % \end{figure}
 
-    I measure the aggressiveness of the national regulation on mergers using historical data on the proportion of proposed mergers that have actions taken against them by the Federal Trade Commission or the Department of Justice.\footnote{\href{https://www.ftc.gov/policy/reports/annual-competition-reports}{https://www.ftc.gov/policy/reports/annual-competition-reports}} I then estimate the following equations: 
+    % \begin{figure}
+    %     \centering
+    %     \caption{Overlap and System Affiliation in Different HRR}
+    %     \includegraphics[width=0.8\linewidth]{Objects/any_formal_diffHRR.pdf}
+    %     \label{fig:any_formal_diffHRR}
+    % \end{figure}
+
+    This estimation provides some insight into whether there is correlation in the timing of these events, but gives little insight into the true nature of \textit{how} overlap and mergers are related. Thus, I leverage changes in the ``price" of merging, and see how this affects informal affiliation. Formal mergers and acquisitions are nationally regulated, and the extent to which they are regulated depends on characteristics of the national government such as political party in office. However, informal affiliations are not nationally regulated, and thus not directly affected by changes in merger regulation ``aggressiveness". If the two are complements, more aggressive regulation on mergers should lead to less leadership overlap as well. If the two are substitutes, more aggressive regulations on mergers should lead to increases in leadership overlap. 
+
+    I measure the aggressiveness of the national regulation on mergers, which I call ``Merger Cost" using historical data on the proportion of proposed mergers that have actions taken against them by the Federal Trade Commission or the Department of Justice.\footnote{\href{https://www.ftc.gov/policy/reports/annual-competition-reports}{https://www.ftc.gov/policy/reports/annual-competition-reports}} This doesn't necessarily mean the mergers were denied, but that more work had to be done, either by the firm or the government, before the merger was approved. Table \ref{tab:reports_actions} presents these figures. 
+
+\begin{table}[htbp]
+    \centering
+    \caption{Number of Reports and Actions by Year}
+    \label{tab:reports_actions}
+    \begin{tabular}{cccc}
+        \hline
+        \textbf{Year} & \textbf{Number of Reports} & \textbf{Number of Actions} & \textbf{Merger Cost} \\
+        \hline
+        2013 & 1,326 & 23 & 0.0173 \\
+        2014 & 1,663 & 17 & 0.0102 \\
+        2015 & 1,801 & 22 & 0.0122 \\
+        2016 & 1,832 & 22 & 0.0120 \\
+        2017 & 2,052 & 23 & 0.0112 \\
+        2018 & 2,111 & 22 & 0.0104 \\
+        2019 & 2,089 & 21 & 0.0101 \\
+        2020 & 1,637 & 28 & 0.0171 \\
+        2021 & 3,520 & 18 & 0.0051 \\
+        2022 & 3,152 & 23 & 0.0073 \\
+        2023 & 1,805 & 16 & 0.0089 \\
+        \hline
+    \end{tabular}
+\end{table}
+    
+    \noindent I then estimate the following equations: 
 
     $$\text{Overlap}_{ht} = MergerCost_t + \alpha_h + \gamma_{HRR},$$
     $$\text{Overlap}_{ht} = MergerCost_{t-1} + \alpha_h + \gamma_{HRR},$$
