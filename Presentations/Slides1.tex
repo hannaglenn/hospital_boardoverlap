@@ -500,11 +500,11 @@ Evidence from Pay-for-Performance}}
         \includegraphics[width=0.9\textwidth]{clips/affiliation2.png}
     \end{columns}
 
-    \vspace{5mm} \pause
+%     \vspace{5mm} \pause
 
-\begin{itemize}
-    \item Organizations denied merger permission b/c of it \small \textcolor{lightgray}{(\cite{huberfeld2006tackling})}\large, declaring informal affiliations through leadership \small \textcolor{lightgray}{(\cite{barnett_babcock_2012})}\large, and in life sciences companies \small \textcolor{lightgray}{(\cite{manjunath2024illegal})}\large
-\end{itemize}
+% \begin{itemize}
+%     \item Organizations denied merger permission b/c of it \small \textcolor{lightgray}{(\cite{huberfeld2006tackling})}\large, declaring informal affiliations through leadership \small \textcolor{lightgray}{(\cite{barnett_babcock_2012})}\large, and in life sciences companies \small \textcolor{lightgray}{(\cite{manjunath2024illegal})}\large
+% \end{itemize}
 \end{frame}
 
 % \begin{frame}{Overlapping Leaders: Should it Actually Matter?}
@@ -796,7 +796,9 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
 
 \vspace{10mm}
 
-\textcolor{purple}{$\implies$ Mergers and overlap have little relationship when considering overlap in the same HRR, but they seem to be substitutes when different HRRs}
+\textcolor{purple}{$\implies$ No relationship when considering overlap in the same market\\
+\vspace{2mm}
+$\implies$ Substitutes when choice set includes out of market}
 \end{frame}
 
 
@@ -852,13 +854,13 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \vspace{3mm}
     \begin{wideitemize}
         \item Rely on more valid comparison groups
-        \item Treatment: gaining or losing affiliation in the same HRR
+        \item Treatment: gaining leadership overlap in the same HRR
         \item Only compare to not-yet-treated hospitals
     \end{wideitemize}
 \end{frame}
 
 \begin{frame}{Estimation: Stacked DiD}
-    Staggered treatment: gaining or losing overlap in the \underline{same market}:
+    Staggered treatment: gaining overlap in the \underline{same market}:
 
     $$Y_{it} = \alpha + \sum_{k \neq -1} \beta_k \cdot D_{i,t+k} + \gamma_i + \delta_t + \varepsilon_{it}$$
 
@@ -870,7 +872,7 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \begin{itemize}
         \item Parallel trends within the selected sample
         \item No spillover effects
-        \item No other events correlated with gaining/losing same-HRR overlap
+        \item No other events correlated with gaining same-HRR overlap
     \end{itemize}
 \end{frame}
 
@@ -909,7 +911,7 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
     \begin{figure}
         \centering
         \includegraphics[width=0.9\linewidth]{Objects/any_purch_gainonly.pdf}
-        \caption{Building/Equipment Purchases}
+        \caption{Any Purchases}
     \end{figure}
 
     \column{0.5\linewidth}
@@ -969,23 +971,23 @@ Merger Cost$_{t-1}$ & \textcolor[HTML]{2E8B57}{-4.88 (0.47)} & \textcolor[HTML]{
 \end{frame}
 
 \begin{frame}{Conclusion}
-    \begin{block}{Why do we need this paper?}
-        Hospital consolidation continues to rise, and it's important to know whether to devote resources to regulating even informal affiliations
+    \begin{block}{}
+        Should we devote resources to regulating informal affiliations as concern over lack of competition rises?
     \end{block}
 
-    \vspace{5mm}
+    \vspace{8mm}
 
     \begin{wideitemize}
-        \item Formal consolidation and leadership overlap are largely unrelated when thinking about relationships within the same HRR
+        \item Within a market, formal and informal affiliations are unrelated
         \begin{itemize}
-            \item However, they seem to be substitutes when considering relationships outside of the market
+            \item But outside of the market, they are substitutes
         \end{itemize}
 
         \item Are within-market informal affiliations anti-competitive?
         \begin{itemize}
             \item Quality improves through better care coordination
             \item More services offered
-            \item No change in patient flows (in aggregate)
+            \item No change in patient flows (in aggregate) or investment
         \end{itemize}
         
         
